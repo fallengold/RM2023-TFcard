@@ -1,0 +1,3268 @@
+ARM GAS  C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s 			page 1
+
+
+   1              		.cpu cortex-m4
+   2              		.eabi_attribute 27, 1
+   3              		.eabi_attribute 28, 1
+   4              		.eabi_attribute 20, 1
+   5              		.eabi_attribute 21, 1
+   6              		.eabi_attribute 23, 3
+   7              		.eabi_attribute 24, 1
+   8              		.eabi_attribute 25, 1
+   9              		.eabi_attribute 26, 1
+  10              		.eabi_attribute 30, 1
+  11              		.eabi_attribute 34, 1
+  12              		.eabi_attribute 18, 4
+  13              		.file	"user_diskio_spi.c"
+  14              		.text
+  15              	.Ltext0:
+  16              		.cfi_sections	.debug_frame
+  17              		.section	.text.xchg_spi,"ax",%progbits
+  18              		.align	1
+  19              		.arch armv7e-m
+  20              		.syntax unified
+  21              		.thumb
+  22              		.thumb_func
+  23              		.fpu fpv4-sp-d16
+  25              	xchg_spi:
+  26              	.LVL0:
+  27              	.LFB134:
+  28              		.file 1 "FATFS/Target/user_diskio_spi.c"
+   1:FATFS/Target/user_diskio_spi.c **** /**
+   2:FATFS/Target/user_diskio_spi.c ****  ******************************************************************************
+   3:FATFS/Target/user_diskio_spi.c ****  * @file    user_diskio_spi.c
+   4:FATFS/Target/user_diskio_spi.c ****  * @brief   This file contains the implementation of the user_diskio_spi FatFs
+   5:FATFS/Target/user_diskio_spi.c ****  *          driver.
+   6:FATFS/Target/user_diskio_spi.c ****  ******************************************************************************
+   7:FATFS/Target/user_diskio_spi.c ****  * Portions copyright (C) 2014, ChaN, all rights reserved.
+   8:FATFS/Target/user_diskio_spi.c ****  * Portions copyright (C) 2017, kiwih, all rights reserved.
+   9:FATFS/Target/user_diskio_spi.c ****  *
+  10:FATFS/Target/user_diskio_spi.c ****  * This software is a free software and there is NO WARRANTY.
+  11:FATFS/Target/user_diskio_spi.c ****  * No restriction on use. You can use, modify and redistribute it for
+  12:FATFS/Target/user_diskio_spi.c ****  * personal, non-profit or commercial products UNDER YOUR RESPONSIBILITY.
+  13:FATFS/Target/user_diskio_spi.c ****  * Redistributions of source code must retain the above copyright notice.
+  14:FATFS/Target/user_diskio_spi.c ****  *
+  15:FATFS/Target/user_diskio_spi.c ****  ******************************************************************************
+  16:FATFS/Target/user_diskio_spi.c ****  */
+  17:FATFS/Target/user_diskio_spi.c **** 
+  18:FATFS/Target/user_diskio_spi.c **** // This code was ported by kiwih from a copywrited (C) library written by ChaN
+  19:FATFS/Target/user_diskio_spi.c **** // available at http://elm-chan.org/fsw/ff/ffsample.zip
+  20:FATFS/Target/user_diskio_spi.c **** //(text at http://elm-chan.org/fsw/ff/00index_e.html)
+  21:FATFS/Target/user_diskio_spi.c **** 
+  22:FATFS/Target/user_diskio_spi.c **** // This file provides the FatFs driver functions and SPI code required to manage
+  23:FATFS/Target/user_diskio_spi.c **** // an SPI-connected MMC or compatible SD card with FAT
+  24:FATFS/Target/user_diskio_spi.c **** 
+  25:FATFS/Target/user_diskio_spi.c **** // It is designed to be wrapped by a cubemx generated user_diskio.c file.
+  26:FATFS/Target/user_diskio_spi.c **** 
+  27:FATFS/Target/user_diskio_spi.c **** #include "stm32g4xx_hal.h" /* Provide the low-level HAL functions */
+  28:FATFS/Target/user_diskio_spi.c **** #include "user_diskio_spi.h"
+  29:FATFS/Target/user_diskio_spi.c **** 
+  30:FATFS/Target/user_diskio_spi.c **** // Make sure you set #define SD_SPI_HANDLE as some hspix in main.h
+ARM GAS  C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s 			page 2
+
+
+  31:FATFS/Target/user_diskio_spi.c **** // Make sure you set #define SD_CS_GPIO_Port as some GPIO port in main.h
+  32:FATFS/Target/user_diskio_spi.c **** // Make sure you set #define SD_CS_Pin as some GPIO pin in main.h
+  33:FATFS/Target/user_diskio_spi.c **** extern SPI_HandleTypeDef SD_SPI_HANDLE;
+  34:FATFS/Target/user_diskio_spi.c **** 
+  35:FATFS/Target/user_diskio_spi.c **** /* Function prototypes */
+  36:FATFS/Target/user_diskio_spi.c **** 
+  37:FATFS/Target/user_diskio_spi.c **** //(Note that the _256 is used as a mask to clear the prescalar bits as it provides binary 111 in th
+  38:FATFS/Target/user_diskio_spi.c **** #define FCLK_SLOW()                                                                                
+  39:FATFS/Target/user_diskio_spi.c **** 	{                                                                                                 
+  40:FATFS/Target/user_diskio_spi.c **** 		MODIFY_REG(SD_SPI_HANDLE.Instance->CR1, SPI_BAUDRATEPRESCALER_256, SPI_BAUDRATEPRESCALER_128); \
+  41:FATFS/Target/user_diskio_spi.c **** 	} /* Set SCLK = slow, approx 280 KBits/s*/
+  42:FATFS/Target/user_diskio_spi.c **** #define FCLK_FAST()                                                                                
+  43:FATFS/Target/user_diskio_spi.c **** 	{                                                                                                \
+  44:FATFS/Target/user_diskio_spi.c **** 		MODIFY_REG(SD_SPI_HANDLE.Instance->CR1, SPI_BAUDRATEPRESCALER_256, SPI_BAUDRATEPRESCALER_8); \
+  45:FATFS/Target/user_diskio_spi.c **** 	} /* Set SCLK = fast, approx 4.5 MBits/s */
+  46:FATFS/Target/user_diskio_spi.c **** 
+  47:FATFS/Target/user_diskio_spi.c **** #define CS_HIGH()                                                    \
+  48:FATFS/Target/user_diskio_spi.c **** 	{                                                                \
+  49:FATFS/Target/user_diskio_spi.c **** 		HAL_GPIO_WritePin(SD_CS_GPIO_Port, SD_CS_Pin, GPIO_PIN_SET); \
+  50:FATFS/Target/user_diskio_spi.c **** 	}
+  51:FATFS/Target/user_diskio_spi.c **** #define CS_LOW()                                                       \
+  52:FATFS/Target/user_diskio_spi.c **** 	{                                                                  \
+  53:FATFS/Target/user_diskio_spi.c **** 		HAL_GPIO_WritePin(SD_CS_GPIO_Port, SD_CS_Pin, GPIO_PIN_RESET); \
+  54:FATFS/Target/user_diskio_spi.c **** 	}
+  55:FATFS/Target/user_diskio_spi.c **** 
+  56:FATFS/Target/user_diskio_spi.c **** /*--------------------------------------------------------------------------
+  57:FATFS/Target/user_diskio_spi.c **** 
+  58:FATFS/Target/user_diskio_spi.c ****    Module Private Functions
+  59:FATFS/Target/user_diskio_spi.c **** 
+  60:FATFS/Target/user_diskio_spi.c **** ---------------------------------------------------------------------------*/
+  61:FATFS/Target/user_diskio_spi.c **** 
+  62:FATFS/Target/user_diskio_spi.c **** /* MMC/SD command */
+  63:FATFS/Target/user_diskio_spi.c **** #define CMD0 (0)		   /* GO_IDLE_STATE */
+  64:FATFS/Target/user_diskio_spi.c **** #define CMD1 (1)		   /* SEND_OP_COND (MMC) */
+  65:FATFS/Target/user_diskio_spi.c **** #define ACMD41 (0x80 + 41) /* SEND_OP_COND (SDC) */
+  66:FATFS/Target/user_diskio_spi.c **** #define CMD8 (8)		   /* SEND_IF_COND */
+  67:FATFS/Target/user_diskio_spi.c **** #define CMD9 (9)		   /* SEND_CSD */
+  68:FATFS/Target/user_diskio_spi.c **** #define CMD10 (10)		   /* SEND_CID */
+  69:FATFS/Target/user_diskio_spi.c **** #define CMD12 (12)		   /* STOP_TRANSMISSION */
+  70:FATFS/Target/user_diskio_spi.c **** #define ACMD13 (0x80 + 13) /* SD_STATUS (SDC) */
+  71:FATFS/Target/user_diskio_spi.c **** #define CMD16 (16)		   /* SET_BLOCKLEN */
+  72:FATFS/Target/user_diskio_spi.c **** #define CMD17 (17)		   /* READ_SINGLE_BLOCK */
+  73:FATFS/Target/user_diskio_spi.c **** #define CMD18 (18)		   /* READ_MULTIPLE_BLOCK */
+  74:FATFS/Target/user_diskio_spi.c **** #define CMD23 (23)		   /* SET_BLOCK_COUNT (MMC) */
+  75:FATFS/Target/user_diskio_spi.c **** #define ACMD23 (0x80 + 23) /* SET_WR_BLK_ERASE_COUNT (SDC) */
+  76:FATFS/Target/user_diskio_spi.c **** #define CMD24 (24)		   /* WRITE_BLOCK */
+  77:FATFS/Target/user_diskio_spi.c **** #define CMD25 (25)		   /* WRITE_MULTIPLE_BLOCK */
+  78:FATFS/Target/user_diskio_spi.c **** #define CMD32 (32)		   /* ERASE_ER_BLK_START */
+  79:FATFS/Target/user_diskio_spi.c **** #define CMD33 (33)		   /* ERASE_ER_BLK_END */
+  80:FATFS/Target/user_diskio_spi.c **** #define CMD38 (38)		   /* ERASE */
+  81:FATFS/Target/user_diskio_spi.c **** #define CMD55 (55)		   /* APP_CMD */
+  82:FATFS/Target/user_diskio_spi.c **** #define CMD58 (58)		   /* READ_OCR */
+  83:FATFS/Target/user_diskio_spi.c **** 
+  84:FATFS/Target/user_diskio_spi.c **** /* MMC card type flags (MMC_GET_TYPE) */
+  85:FATFS/Target/user_diskio_spi.c **** #define CT_MMC 0x01				 /* MMC ver 3 */
+  86:FATFS/Target/user_diskio_spi.c **** #define CT_SD1 0x02				 /* SD ver 1 */
+  87:FATFS/Target/user_diskio_spi.c **** #define CT_SD2 0x04				 /* SD ver 2 */
+ARM GAS  C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s 			page 3
+
+
+  88:FATFS/Target/user_diskio_spi.c **** #define CT_SDC (CT_SD1 | CT_SD2) /* SD */
+  89:FATFS/Target/user_diskio_spi.c **** #define CT_BLOCK 0x08			 /* Block addressing */
+  90:FATFS/Target/user_diskio_spi.c **** 
+  91:FATFS/Target/user_diskio_spi.c **** static volatile DSTATUS Stat = STA_NOINIT; /* Physical drive status */
+  92:FATFS/Target/user_diskio_spi.c **** 
+  93:FATFS/Target/user_diskio_spi.c **** static BYTE CardType; /* Card type flags */
+  94:FATFS/Target/user_diskio_spi.c **** 
+  95:FATFS/Target/user_diskio_spi.c **** uint32_t spiTimerTickStart;
+  96:FATFS/Target/user_diskio_spi.c **** uint32_t spiTimerTickDelay;
+  97:FATFS/Target/user_diskio_spi.c **** 
+  98:FATFS/Target/user_diskio_spi.c **** void SPI_Timer_On(uint32_t waitTicks)
+  99:FATFS/Target/user_diskio_spi.c **** {
+ 100:FATFS/Target/user_diskio_spi.c **** 	spiTimerTickStart = HAL_GetTick();
+ 101:FATFS/Target/user_diskio_spi.c **** 	spiTimerTickDelay = waitTicks;
+ 102:FATFS/Target/user_diskio_spi.c **** }
+ 103:FATFS/Target/user_diskio_spi.c **** 
+ 104:FATFS/Target/user_diskio_spi.c **** uint8_t SPI_Timer_Status()
+ 105:FATFS/Target/user_diskio_spi.c **** {
+ 106:FATFS/Target/user_diskio_spi.c **** 	return ((HAL_GetTick() - spiTimerTickStart) < spiTimerTickDelay);
+ 107:FATFS/Target/user_diskio_spi.c **** }
+ 108:FATFS/Target/user_diskio_spi.c **** 
+ 109:FATFS/Target/user_diskio_spi.c **** /*-----------------------------------------------------------------------*/
+ 110:FATFS/Target/user_diskio_spi.c **** /* SPI controls (Platform dependent)                                     */
+ 111:FATFS/Target/user_diskio_spi.c **** /*-----------------------------------------------------------------------*/
+ 112:FATFS/Target/user_diskio_spi.c **** 
+ 113:FATFS/Target/user_diskio_spi.c **** /* Exchange a byte */
+ 114:FATFS/Target/user_diskio_spi.c **** static BYTE xchg_spi(
+ 115:FATFS/Target/user_diskio_spi.c **** 	BYTE dat /* Data to send */
+ 116:FATFS/Target/user_diskio_spi.c **** )
+ 117:FATFS/Target/user_diskio_spi.c **** {
+  29              		.loc 1 117 1 view -0
+  30              		.cfi_startproc
+  31              		@ args = 0, pretend = 0, frame = 16
+  32              		@ frame_needed = 0, uses_anonymous_args = 0
+  33              		.loc 1 117 1 is_stmt 0 view .LVU1
+  34 0000 00B5     		push	{lr}
+  35              	.LCFI0:
+  36              		.cfi_def_cfa_offset 4
+  37              		.cfi_offset 14, -4
+  38 0002 87B0     		sub	sp, sp, #28
+  39              	.LCFI1:
+  40              		.cfi_def_cfa_offset 32
+  41 0004 8DF80F00 		strb	r0, [sp, #15]
+ 118:FATFS/Target/user_diskio_spi.c **** 	BYTE rxDat;
+  42              		.loc 1 118 2 is_stmt 1 view .LVU2
+ 119:FATFS/Target/user_diskio_spi.c **** 	HAL_SPI_TransmitReceive(&SD_SPI_HANDLE, &dat, &rxDat, 1, 50);
+  43              		.loc 1 119 2 view .LVU3
+  44 0008 3223     		movs	r3, #50
+  45 000a 0093     		str	r3, [sp]
+  46 000c 0123     		movs	r3, #1
+  47 000e 0DF11702 		add	r2, sp, #23
+  48 0012 0DF10F01 		add	r1, sp, #15
+  49 0016 0448     		ldr	r0, .L3
+  50              	.LVL1:
+  51              		.loc 1 119 2 is_stmt 0 view .LVU4
+  52 0018 FFF7FEFF 		bl	HAL_SPI_TransmitReceive
+  53              	.LVL2:
+ARM GAS  C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s 			page 4
+
+
+ 120:FATFS/Target/user_diskio_spi.c **** 	return rxDat;
+  54              		.loc 1 120 2 is_stmt 1 view .LVU5
+ 121:FATFS/Target/user_diskio_spi.c **** }
+  55              		.loc 1 121 1 is_stmt 0 view .LVU6
+  56 001c 9DF81700 		ldrb	r0, [sp, #23]	@ zero_extendqisi2
+  57 0020 07B0     		add	sp, sp, #28
+  58              	.LCFI2:
+  59              		.cfi_def_cfa_offset 4
+  60              		@ sp needed
+  61 0022 5DF804FB 		ldr	pc, [sp], #4
+  62              	.L4:
+  63 0026 00BF     		.align	2
+  64              	.L3:
+  65 0028 00000000 		.word	hspi2
+  66              		.cfi_endproc
+  67              	.LFE134:
+  69              		.section	.text.wait_ready,"ax",%progbits
+  70              		.align	1
+  71              		.syntax unified
+  72              		.thumb
+  73              		.thumb_func
+  74              		.fpu fpv4-sp-d16
+  76              	wait_ready:
+  77              	.LVL3:
+  78              	.LFB137:
+ 122:FATFS/Target/user_diskio_spi.c **** 
+ 123:FATFS/Target/user_diskio_spi.c **** /* Receive multiple byte */
+ 124:FATFS/Target/user_diskio_spi.c **** static void rcvr_spi_multi(
+ 125:FATFS/Target/user_diskio_spi.c **** 	BYTE *buff, /* Pointer to data buffer */
+ 126:FATFS/Target/user_diskio_spi.c **** 	UINT btr	/* Number of bytes to receive (even number) */
+ 127:FATFS/Target/user_diskio_spi.c **** )
+ 128:FATFS/Target/user_diskio_spi.c **** {
+ 129:FATFS/Target/user_diskio_spi.c **** 	for (UINT i = 0; i < btr; i++)
+ 130:FATFS/Target/user_diskio_spi.c **** 	{
+ 131:FATFS/Target/user_diskio_spi.c **** 		*(buff + i) = xchg_spi(0xFF);
+ 132:FATFS/Target/user_diskio_spi.c **** 	}
+ 133:FATFS/Target/user_diskio_spi.c **** }
+ 134:FATFS/Target/user_diskio_spi.c **** 
+ 135:FATFS/Target/user_diskio_spi.c **** #if _USE_WRITE
+ 136:FATFS/Target/user_diskio_spi.c **** /* Send multiple byte */
+ 137:FATFS/Target/user_diskio_spi.c **** static void xmit_spi_multi(
+ 138:FATFS/Target/user_diskio_spi.c **** 	const BYTE *buff, /* Pointer to the data */
+ 139:FATFS/Target/user_diskio_spi.c **** 	UINT btx		  /* Number of bytes to send (even number) */
+ 140:FATFS/Target/user_diskio_spi.c **** )
+ 141:FATFS/Target/user_diskio_spi.c **** {
+ 142:FATFS/Target/user_diskio_spi.c **** 	for (UINT i = 0; i < btx; i++)
+ 143:FATFS/Target/user_diskio_spi.c **** 	{
+ 144:FATFS/Target/user_diskio_spi.c **** 		xchg_spi(*(buff + i));
+ 145:FATFS/Target/user_diskio_spi.c **** 	}
+ 146:FATFS/Target/user_diskio_spi.c **** }
+ 147:FATFS/Target/user_diskio_spi.c **** #endif
+ 148:FATFS/Target/user_diskio_spi.c **** 
+ 149:FATFS/Target/user_diskio_spi.c **** /*-----------------------------------------------------------------------*/
+ 150:FATFS/Target/user_diskio_spi.c **** /* Wait for card ready                                                   */
+ 151:FATFS/Target/user_diskio_spi.c **** /*-----------------------------------------------------------------------*/
+ 152:FATFS/Target/user_diskio_spi.c **** 
+ 153:FATFS/Target/user_diskio_spi.c **** static int wait_ready(		  /* 1:Ready, 0:Timeout */
+ARM GAS  C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s 			page 5
+
+
+ 154:FATFS/Target/user_diskio_spi.c **** 					  UINT wt /* Timeout [ms] */
+ 155:FATFS/Target/user_diskio_spi.c **** )
+ 156:FATFS/Target/user_diskio_spi.c **** {
+  79              		.loc 1 156 1 is_stmt 1 view -0
+  80              		.cfi_startproc
+  81              		@ args = 0, pretend = 0, frame = 0
+  82              		@ frame_needed = 0, uses_anonymous_args = 0
+  83              		.loc 1 156 1 is_stmt 0 view .LVU8
+  84 0000 70B5     		push	{r4, r5, r6, lr}
+  85              	.LCFI3:
+  86              		.cfi_def_cfa_offset 16
+  87              		.cfi_offset 4, -16
+  88              		.cfi_offset 5, -12
+  89              		.cfi_offset 6, -8
+  90              		.cfi_offset 14, -4
+  91 0002 0646     		mov	r6, r0
+ 157:FATFS/Target/user_diskio_spi.c **** 	BYTE d;
+  92              		.loc 1 157 2 is_stmt 1 view .LVU9
+ 158:FATFS/Target/user_diskio_spi.c **** 	// wait_ready needs its own timer, unfortunately, so it can't use the
+ 159:FATFS/Target/user_diskio_spi.c **** 	// spi_timer functions
+ 160:FATFS/Target/user_diskio_spi.c **** 	uint32_t waitSpiTimerTickStart;
+  93              		.loc 1 160 2 view .LVU10
+ 161:FATFS/Target/user_diskio_spi.c **** 	uint32_t waitSpiTimerTickDelay;
+  94              		.loc 1 161 2 view .LVU11
+ 162:FATFS/Target/user_diskio_spi.c **** 
+ 163:FATFS/Target/user_diskio_spi.c **** 	waitSpiTimerTickStart = HAL_GetTick();
+  95              		.loc 1 163 2 view .LVU12
+  96              		.loc 1 163 26 is_stmt 0 view .LVU13
+  97 0004 FFF7FEFF 		bl	HAL_GetTick
+  98              	.LVL4:
+  99              		.loc 1 163 26 view .LVU14
+ 100 0008 0546     		mov	r5, r0
+ 101              	.LVL5:
+ 164:FATFS/Target/user_diskio_spi.c **** 	waitSpiTimerTickDelay = (uint32_t)wt;
+ 102              		.loc 1 164 2 is_stmt 1 view .LVU15
+ 103              	.L7:
+ 165:FATFS/Target/user_diskio_spi.c **** 	do
+ 104              		.loc 1 165 2 discriminator 2 view .LVU16
+ 166:FATFS/Target/user_diskio_spi.c **** 	{
+ 167:FATFS/Target/user_diskio_spi.c **** 		d = xchg_spi(0xFF);
+ 105              		.loc 1 167 3 discriminator 2 view .LVU17
+ 106              		.loc 1 167 7 is_stmt 0 discriminator 2 view .LVU18
+ 107 000a FF20     		movs	r0, #255
+ 108 000c FFF7FEFF 		bl	xchg_spi
+ 109              	.LVL6:
+ 110 0010 0446     		mov	r4, r0
+ 111              	.LVL7:
+ 168:FATFS/Target/user_diskio_spi.c **** 		/* This loop takes a time. Insert rot_rdq() here for multitask envilonment. */
+ 169:FATFS/Target/user_diskio_spi.c **** 	} while (d != 0xFF && ((HAL_GetTick() - waitSpiTimerTickStart) < waitSpiTimerTickDelay)); /* Wait 
+ 112              		.loc 1 169 10 is_stmt 1 discriminator 2 view .LVU19
+ 113              		.loc 1 169 2 is_stmt 0 discriminator 2 view .LVU20
+ 114 0012 FF28     		cmp	r0, #255
+ 115 0014 04D0     		beq	.L6
+ 116              		.loc 1 169 26 discriminator 1 view .LVU21
+ 117 0016 FFF7FEFF 		bl	HAL_GetTick
+ 118              	.LVL8:
+ 119              		.loc 1 169 40 discriminator 1 view .LVU22
+ARM GAS  C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s 			page 6
+
+
+ 120 001a 401B     		subs	r0, r0, r5
+ 121              		.loc 1 169 21 discriminator 1 view .LVU23
+ 122 001c B042     		cmp	r0, r6
+ 123 001e F4D3     		bcc	.L7
+ 124              	.L6:
+ 170:FATFS/Target/user_diskio_spi.c **** 
+ 171:FATFS/Target/user_diskio_spi.c **** 	return (d == 0xFF) ? 1 : 0;
+ 125              		.loc 1 171 2 is_stmt 1 view .LVU24
+ 172:FATFS/Target/user_diskio_spi.c **** }
+ 126              		.loc 1 172 1 is_stmt 0 view .LVU25
+ 127 0020 FF2C     		cmp	r4, #255
+ 128 0022 14BF     		ite	ne
+ 129 0024 0020     		movne	r0, #0
+ 130 0026 0120     		moveq	r0, #1
+ 131 0028 70BD     		pop	{r4, r5, r6, pc}
+ 132              		.loc 1 172 1 view .LVU26
+ 133              		.cfi_endproc
+ 134              	.LFE137:
+ 136              		.section	.text.rcvr_spi_multi,"ax",%progbits
+ 137              		.align	1
+ 138              		.syntax unified
+ 139              		.thumb
+ 140              		.thumb_func
+ 141              		.fpu fpv4-sp-d16
+ 143              	rcvr_spi_multi:
+ 144              	.LVL9:
+ 145              	.LFB135:
+ 128:FATFS/Target/user_diskio_spi.c **** 	for (UINT i = 0; i < btr; i++)
+ 146              		.loc 1 128 1 is_stmt 1 view -0
+ 147              		.cfi_startproc
+ 148              		@ args = 0, pretend = 0, frame = 0
+ 149              		@ frame_needed = 0, uses_anonymous_args = 0
+ 128:FATFS/Target/user_diskio_spi.c **** 	for (UINT i = 0; i < btr; i++)
+ 150              		.loc 1 128 1 is_stmt 0 view .LVU28
+ 151 0000 70B5     		push	{r4, r5, r6, lr}
+ 152              	.LCFI4:
+ 153              		.cfi_def_cfa_offset 16
+ 154              		.cfi_offset 4, -16
+ 155              		.cfi_offset 5, -12
+ 156              		.cfi_offset 6, -8
+ 157              		.cfi_offset 14, -4
+ 158 0002 0646     		mov	r6, r0
+ 159 0004 0D46     		mov	r5, r1
+ 129:FATFS/Target/user_diskio_spi.c **** 	{
+ 160              		.loc 1 129 2 is_stmt 1 view .LVU29
+ 161              	.LBB2:
+ 129:FATFS/Target/user_diskio_spi.c **** 	{
+ 162              		.loc 1 129 7 view .LVU30
+ 163              	.LVL10:
+ 129:FATFS/Target/user_diskio_spi.c **** 	{
+ 164              		.loc 1 129 12 is_stmt 0 view .LVU31
+ 165 0006 0024     		movs	r4, #0
+ 129:FATFS/Target/user_diskio_spi.c **** 	{
+ 166              		.loc 1 129 2 view .LVU32
+ 167 0008 04E0     		b	.L10
+ 168              	.LVL11:
+ 169              	.L11:
+ARM GAS  C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s 			page 7
+
+
+ 131:FATFS/Target/user_diskio_spi.c **** 	}
+ 170              		.loc 1 131 3 is_stmt 1 discriminator 3 view .LVU33
+ 131:FATFS/Target/user_diskio_spi.c **** 	}
+ 171              		.loc 1 131 17 is_stmt 0 discriminator 3 view .LVU34
+ 172 000a FF20     		movs	r0, #255
+ 173 000c FFF7FEFF 		bl	xchg_spi
+ 174              	.LVL12:
+ 131:FATFS/Target/user_diskio_spi.c **** 	}
+ 175              		.loc 1 131 15 discriminator 3 view .LVU35
+ 176 0010 3055     		strb	r0, [r6, r4]
+ 129:FATFS/Target/user_diskio_spi.c **** 	{
+ 177              		.loc 1 129 28 is_stmt 1 discriminator 3 view .LVU36
+ 129:FATFS/Target/user_diskio_spi.c **** 	{
+ 178              		.loc 1 129 29 is_stmt 0 discriminator 3 view .LVU37
+ 179 0012 0134     		adds	r4, r4, #1
+ 180              	.LVL13:
+ 181              	.L10:
+ 129:FATFS/Target/user_diskio_spi.c **** 	{
+ 182              		.loc 1 129 19 is_stmt 1 discriminator 1 view .LVU38
+ 129:FATFS/Target/user_diskio_spi.c **** 	{
+ 183              		.loc 1 129 2 is_stmt 0 discriminator 1 view .LVU39
+ 184 0014 AC42     		cmp	r4, r5
+ 185 0016 F8D3     		bcc	.L11
+ 186              	.LBE2:
+ 133:FATFS/Target/user_diskio_spi.c **** 
+ 187              		.loc 1 133 1 view .LVU40
+ 188 0018 70BD     		pop	{r4, r5, r6, pc}
+ 133:FATFS/Target/user_diskio_spi.c **** 
+ 189              		.loc 1 133 1 view .LVU41
+ 190              		.cfi_endproc
+ 191              	.LFE135:
+ 193              		.section	.text.xmit_spi_multi,"ax",%progbits
+ 194              		.align	1
+ 195              		.syntax unified
+ 196              		.thumb
+ 197              		.thumb_func
+ 198              		.fpu fpv4-sp-d16
+ 200              	xmit_spi_multi:
+ 201              	.LVL14:
+ 202              	.LFB136:
+ 141:FATFS/Target/user_diskio_spi.c **** 	for (UINT i = 0; i < btx; i++)
+ 203              		.loc 1 141 1 is_stmt 1 view -0
+ 204              		.cfi_startproc
+ 205              		@ args = 0, pretend = 0, frame = 0
+ 206              		@ frame_needed = 0, uses_anonymous_args = 0
+ 141:FATFS/Target/user_diskio_spi.c **** 	for (UINT i = 0; i < btx; i++)
+ 207              		.loc 1 141 1 is_stmt 0 view .LVU43
+ 208 0000 70B5     		push	{r4, r5, r6, lr}
+ 209              	.LCFI5:
+ 210              		.cfi_def_cfa_offset 16
+ 211              		.cfi_offset 4, -16
+ 212              		.cfi_offset 5, -12
+ 213              		.cfi_offset 6, -8
+ 214              		.cfi_offset 14, -4
+ 215 0002 0646     		mov	r6, r0
+ 216 0004 0D46     		mov	r5, r1
+ 142:FATFS/Target/user_diskio_spi.c **** 	{
+ARM GAS  C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s 			page 8
+
+
+ 217              		.loc 1 142 2 is_stmt 1 view .LVU44
+ 218              	.LBB3:
+ 142:FATFS/Target/user_diskio_spi.c **** 	{
+ 219              		.loc 1 142 7 view .LVU45
+ 220              	.LVL15:
+ 142:FATFS/Target/user_diskio_spi.c **** 	{
+ 221              		.loc 1 142 12 is_stmt 0 view .LVU46
+ 222 0006 0024     		movs	r4, #0
+ 142:FATFS/Target/user_diskio_spi.c **** 	{
+ 223              		.loc 1 142 2 view .LVU47
+ 224 0008 03E0     		b	.L14
+ 225              	.LVL16:
+ 226              	.L15:
+ 144:FATFS/Target/user_diskio_spi.c **** 	}
+ 227              		.loc 1 144 3 is_stmt 1 discriminator 3 view .LVU48
+ 228 000a 305D     		ldrb	r0, [r6, r4]	@ zero_extendqisi2
+ 229 000c FFF7FEFF 		bl	xchg_spi
+ 230              	.LVL17:
+ 142:FATFS/Target/user_diskio_spi.c **** 	{
+ 231              		.loc 1 142 28 discriminator 3 view .LVU49
+ 142:FATFS/Target/user_diskio_spi.c **** 	{
+ 232              		.loc 1 142 29 is_stmt 0 discriminator 3 view .LVU50
+ 233 0010 0134     		adds	r4, r4, #1
+ 234              	.LVL18:
+ 235              	.L14:
+ 142:FATFS/Target/user_diskio_spi.c **** 	{
+ 236              		.loc 1 142 19 is_stmt 1 discriminator 1 view .LVU51
+ 142:FATFS/Target/user_diskio_spi.c **** 	{
+ 237              		.loc 1 142 2 is_stmt 0 discriminator 1 view .LVU52
+ 238 0012 AC42     		cmp	r4, r5
+ 239 0014 F9D3     		bcc	.L15
+ 240              	.LBE3:
+ 146:FATFS/Target/user_diskio_spi.c **** #endif
+ 241              		.loc 1 146 1 view .LVU53
+ 242 0016 70BD     		pop	{r4, r5, r6, pc}
+ 146:FATFS/Target/user_diskio_spi.c **** #endif
+ 243              		.loc 1 146 1 view .LVU54
+ 244              		.cfi_endproc
+ 245              	.LFE136:
+ 247              		.section	.text.xmit_datablock,"ax",%progbits
+ 248              		.align	1
+ 249              		.syntax unified
+ 250              		.thumb
+ 251              		.thumb_func
+ 252              		.fpu fpv4-sp-d16
+ 254              	xmit_datablock:
+ 255              	.LVL19:
+ 256              	.LFB141:
+ 173:FATFS/Target/user_diskio_spi.c **** 
+ 174:FATFS/Target/user_diskio_spi.c **** /*-----------------------------------------------------------------------*/
+ 175:FATFS/Target/user_diskio_spi.c **** /* Despiselect card and release SPI                                         */
+ 176:FATFS/Target/user_diskio_spi.c **** /*-----------------------------------------------------------------------*/
+ 177:FATFS/Target/user_diskio_spi.c **** 
+ 178:FATFS/Target/user_diskio_spi.c **** static void despiselect(void)
+ 179:FATFS/Target/user_diskio_spi.c **** {
+ 180:FATFS/Target/user_diskio_spi.c **** 	CS_HIGH();		/* Set CS# high */
+ 181:FATFS/Target/user_diskio_spi.c **** 	xchg_spi(0xFF); /* Dummy clock (force DO hi-z for multiple slave SPI) */
+ARM GAS  C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s 			page 9
+
+
+ 182:FATFS/Target/user_diskio_spi.c **** }
+ 183:FATFS/Target/user_diskio_spi.c **** 
+ 184:FATFS/Target/user_diskio_spi.c **** /*-----------------------------------------------------------------------*/
+ 185:FATFS/Target/user_diskio_spi.c **** /* Select card and wait for ready                                        */
+ 186:FATFS/Target/user_diskio_spi.c **** /*-----------------------------------------------------------------------*/
+ 187:FATFS/Target/user_diskio_spi.c **** 
+ 188:FATFS/Target/user_diskio_spi.c **** static int spiselect(void) /* 1:OK, 0:Timeout */
+ 189:FATFS/Target/user_diskio_spi.c **** {
+ 190:FATFS/Target/user_diskio_spi.c **** 	CS_LOW();		/* Set CS# low */
+ 191:FATFS/Target/user_diskio_spi.c **** 	xchg_spi(0xFF); /* Dummy clock (force DO enabled) */
+ 192:FATFS/Target/user_diskio_spi.c **** 	if (wait_ready(500))
+ 193:FATFS/Target/user_diskio_spi.c **** 		return 1; /* Wait for card ready */
+ 194:FATFS/Target/user_diskio_spi.c **** 
+ 195:FATFS/Target/user_diskio_spi.c **** 	despiselect();
+ 196:FATFS/Target/user_diskio_spi.c **** 	return 0; /* Timeout */
+ 197:FATFS/Target/user_diskio_spi.c **** }
+ 198:FATFS/Target/user_diskio_spi.c **** 
+ 199:FATFS/Target/user_diskio_spi.c **** /*-----------------------------------------------------------------------*/
+ 200:FATFS/Target/user_diskio_spi.c **** /* Receive a data packet from the MMC                                    */
+ 201:FATFS/Target/user_diskio_spi.c **** /*-----------------------------------------------------------------------*/
+ 202:FATFS/Target/user_diskio_spi.c **** 
+ 203:FATFS/Target/user_diskio_spi.c **** static int rcvr_datablock(			  /* 1:OK, 0:Error */
+ 204:FATFS/Target/user_diskio_spi.c **** 						  BYTE *buff, /* Data buffer */
+ 205:FATFS/Target/user_diskio_spi.c **** 						  UINT btr	  /* Data block length (byte) */
+ 206:FATFS/Target/user_diskio_spi.c **** )
+ 207:FATFS/Target/user_diskio_spi.c **** {
+ 208:FATFS/Target/user_diskio_spi.c **** 	BYTE token;
+ 209:FATFS/Target/user_diskio_spi.c **** 
+ 210:FATFS/Target/user_diskio_spi.c **** 	SPI_Timer_On(200);
+ 211:FATFS/Target/user_diskio_spi.c **** 	do
+ 212:FATFS/Target/user_diskio_spi.c **** 	{ /* Wait for DataStart token in timeout of 200ms */
+ 213:FATFS/Target/user_diskio_spi.c **** 		token = xchg_spi(0xFF);
+ 214:FATFS/Target/user_diskio_spi.c **** 		/* This loop will take a time. Insert rot_rdq() here for multitask envilonment. */
+ 215:FATFS/Target/user_diskio_spi.c **** 	} while ((token == 0xFF) && SPI_Timer_Status());
+ 216:FATFS/Target/user_diskio_spi.c **** 	if (token != 0xFE)
+ 217:FATFS/Target/user_diskio_spi.c **** 		return 0; /* Function fails if invalid DataStart token or timeout */
+ 218:FATFS/Target/user_diskio_spi.c **** 
+ 219:FATFS/Target/user_diskio_spi.c **** 	rcvr_spi_multi(buff, btr); /* Store trailing data to the buffer */
+ 220:FATFS/Target/user_diskio_spi.c **** 	xchg_spi(0xFF);
+ 221:FATFS/Target/user_diskio_spi.c **** 	xchg_spi(0xFF); /* Discard CRC */
+ 222:FATFS/Target/user_diskio_spi.c **** 
+ 223:FATFS/Target/user_diskio_spi.c **** 	return 1; /* Function succeeded */
+ 224:FATFS/Target/user_diskio_spi.c **** }
+ 225:FATFS/Target/user_diskio_spi.c **** 
+ 226:FATFS/Target/user_diskio_spi.c **** /*-----------------------------------------------------------------------*/
+ 227:FATFS/Target/user_diskio_spi.c **** /* Send a data packet to the MMC                                         */
+ 228:FATFS/Target/user_diskio_spi.c **** /*-----------------------------------------------------------------------*/
+ 229:FATFS/Target/user_diskio_spi.c **** 
+ 230:FATFS/Target/user_diskio_spi.c **** #if _USE_WRITE
+ 231:FATFS/Target/user_diskio_spi.c **** static int xmit_datablock(					/* 1:OK, 0:Failed */
+ 232:FATFS/Target/user_diskio_spi.c **** 						  const BYTE *buff, /* Ponter to 512 byte data to be sent */
+ 233:FATFS/Target/user_diskio_spi.c **** 						  BYTE token		/* Token */
+ 234:FATFS/Target/user_diskio_spi.c **** )
+ 235:FATFS/Target/user_diskio_spi.c **** {
+ 257              		.loc 1 235 1 is_stmt 1 view -0
+ 258              		.cfi_startproc
+ 259              		@ args = 0, pretend = 0, frame = 0
+ARM GAS  C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s 			page 10
+
+
+ 260              		@ frame_needed = 0, uses_anonymous_args = 0
+ 261              		.loc 1 235 1 is_stmt 0 view .LVU56
+ 262 0000 38B5     		push	{r3, r4, r5, lr}
+ 263              	.LCFI6:
+ 264              		.cfi_def_cfa_offset 16
+ 265              		.cfi_offset 3, -16
+ 266              		.cfi_offset 4, -12
+ 267              		.cfi_offset 5, -8
+ 268              		.cfi_offset 14, -4
+ 269 0002 0546     		mov	r5, r0
+ 270 0004 0C46     		mov	r4, r1
+ 236:FATFS/Target/user_diskio_spi.c **** 	BYTE resp;
+ 271              		.loc 1 236 2 is_stmt 1 view .LVU57
+ 237:FATFS/Target/user_diskio_spi.c **** 
+ 238:FATFS/Target/user_diskio_spi.c **** 	if (!wait_ready(500))
+ 272              		.loc 1 238 2 view .LVU58
+ 273              		.loc 1 238 7 is_stmt 0 view .LVU59
+ 274 0006 4FF4FA70 		mov	r0, #500
+ 275              	.LVL20:
+ 276              		.loc 1 238 7 view .LVU60
+ 277 000a FFF7FEFF 		bl	wait_ready
+ 278              	.LVL21:
+ 279              		.loc 1 238 5 view .LVU61
+ 280 000e 00B9     		cbnz	r0, .L22
+ 281              	.L17:
+ 239:FATFS/Target/user_diskio_spi.c **** 		return 0; /* Wait for card ready */
+ 240:FATFS/Target/user_diskio_spi.c **** 
+ 241:FATFS/Target/user_diskio_spi.c **** 	xchg_spi(token); /* Send token */
+ 242:FATFS/Target/user_diskio_spi.c **** 	if (token != 0xFD)
+ 243:FATFS/Target/user_diskio_spi.c **** 	{							   /* Send data if token is other than StopTran */
+ 244:FATFS/Target/user_diskio_spi.c **** 		xmit_spi_multi(buff, 512); /* Data */
+ 245:FATFS/Target/user_diskio_spi.c **** 		xchg_spi(0xFF);
+ 246:FATFS/Target/user_diskio_spi.c **** 		xchg_spi(0xFF); /* Dummy CRC */
+ 247:FATFS/Target/user_diskio_spi.c **** 
+ 248:FATFS/Target/user_diskio_spi.c **** 		resp = xchg_spi(0xFF); /* Receive data resp */
+ 249:FATFS/Target/user_diskio_spi.c **** 		if ((resp & 0x1F) != 0x05)
+ 250:FATFS/Target/user_diskio_spi.c **** 			return 0; /* Function fails if the data packet was not accepted */
+ 251:FATFS/Target/user_diskio_spi.c **** 	}
+ 252:FATFS/Target/user_diskio_spi.c **** 	return 1;
+ 253:FATFS/Target/user_diskio_spi.c **** }
+ 282              		.loc 1 253 1 view .LVU62
+ 283 0010 38BD     		pop	{r3, r4, r5, pc}
+ 284              	.LVL22:
+ 285              	.L22:
+ 241:FATFS/Target/user_diskio_spi.c **** 	if (token != 0xFD)
+ 286              		.loc 1 241 2 is_stmt 1 view .LVU63
+ 287 0012 2046     		mov	r0, r4
+ 288 0014 FFF7FEFF 		bl	xchg_spi
+ 289              	.LVL23:
+ 242:FATFS/Target/user_diskio_spi.c **** 	{							   /* Send data if token is other than StopTran */
+ 290              		.loc 1 242 2 view .LVU64
+ 242:FATFS/Target/user_diskio_spi.c **** 	{							   /* Send data if token is other than StopTran */
+ 291              		.loc 1 242 5 is_stmt 0 view .LVU65
+ 292 0018 FD2C     		cmp	r4, #253
+ 293 001a 01D1     		bne	.L23
+ 252:FATFS/Target/user_diskio_spi.c **** }
+ 294              		.loc 1 252 9 view .LVU66
+ARM GAS  C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s 			page 11
+
+
+ 295 001c 0120     		movs	r0, #1
+ 296 001e F7E7     		b	.L17
+ 297              	.L23:
+ 244:FATFS/Target/user_diskio_spi.c **** 		xchg_spi(0xFF);
+ 298              		.loc 1 244 3 is_stmt 1 view .LVU67
+ 299 0020 4FF40071 		mov	r1, #512
+ 300 0024 2846     		mov	r0, r5
+ 301 0026 FFF7FEFF 		bl	xmit_spi_multi
+ 302              	.LVL24:
+ 245:FATFS/Target/user_diskio_spi.c **** 		xchg_spi(0xFF); /* Dummy CRC */
+ 303              		.loc 1 245 3 view .LVU68
+ 304 002a FF20     		movs	r0, #255
+ 305 002c FFF7FEFF 		bl	xchg_spi
+ 306              	.LVL25:
+ 246:FATFS/Target/user_diskio_spi.c **** 
+ 307              		.loc 1 246 3 view .LVU69
+ 308 0030 FF20     		movs	r0, #255
+ 309 0032 FFF7FEFF 		bl	xchg_spi
+ 310              	.LVL26:
+ 248:FATFS/Target/user_diskio_spi.c **** 		if ((resp & 0x1F) != 0x05)
+ 311              		.loc 1 248 3 view .LVU70
+ 248:FATFS/Target/user_diskio_spi.c **** 		if ((resp & 0x1F) != 0x05)
+ 312              		.loc 1 248 10 is_stmt 0 view .LVU71
+ 313 0036 FF20     		movs	r0, #255
+ 314 0038 FFF7FEFF 		bl	xchg_spi
+ 315              	.LVL27:
+ 249:FATFS/Target/user_diskio_spi.c **** 			return 0; /* Function fails if the data packet was not accepted */
+ 316              		.loc 1 249 3 is_stmt 1 view .LVU72
+ 249:FATFS/Target/user_diskio_spi.c **** 			return 0; /* Function fails if the data packet was not accepted */
+ 317              		.loc 1 249 6 is_stmt 0 view .LVU73
+ 318 003c 00F01F00 		and	r0, r0, #31
+ 319              	.LVL28:
+ 249:FATFS/Target/user_diskio_spi.c **** 			return 0; /* Function fails if the data packet was not accepted */
+ 320              		.loc 1 249 6 view .LVU74
+ 321 0040 0528     		cmp	r0, #5
+ 322 0042 01D1     		bne	.L20
+ 252:FATFS/Target/user_diskio_spi.c **** }
+ 323              		.loc 1 252 9 view .LVU75
+ 324 0044 0120     		movs	r0, #1
+ 325 0046 E3E7     		b	.L17
+ 326              	.L20:
+ 250:FATFS/Target/user_diskio_spi.c **** 	}
+ 327              		.loc 1 250 11 view .LVU76
+ 328 0048 0020     		movs	r0, #0
+ 329 004a E1E7     		b	.L17
+ 330              		.cfi_endproc
+ 331              	.LFE141:
+ 333              		.section	.text.despiselect,"ax",%progbits
+ 334              		.align	1
+ 335              		.syntax unified
+ 336              		.thumb
+ 337              		.thumb_func
+ 338              		.fpu fpv4-sp-d16
+ 340              	despiselect:
+ 341              	.LFB138:
+ 179:FATFS/Target/user_diskio_spi.c **** 	CS_HIGH();		/* Set CS# high */
+ 342              		.loc 1 179 1 is_stmt 1 view -0
+ARM GAS  C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s 			page 12
+
+
+ 343              		.cfi_startproc
+ 344              		@ args = 0, pretend = 0, frame = 0
+ 345              		@ frame_needed = 0, uses_anonymous_args = 0
+ 346 0000 08B5     		push	{r3, lr}
+ 347              	.LCFI7:
+ 348              		.cfi_def_cfa_offset 8
+ 349              		.cfi_offset 3, -8
+ 350              		.cfi_offset 14, -4
+ 180:FATFS/Target/user_diskio_spi.c **** 	xchg_spi(0xFF); /* Dummy clock (force DO hi-z for multiple slave SPI) */
+ 351              		.loc 1 180 2 view .LVU78
+ 352 0002 0122     		movs	r2, #1
+ 353 0004 4FF48051 		mov	r1, #4096
+ 354 0008 0348     		ldr	r0, .L26
+ 355 000a FFF7FEFF 		bl	HAL_GPIO_WritePin
+ 356              	.LVL29:
+ 180:FATFS/Target/user_diskio_spi.c **** 	xchg_spi(0xFF); /* Dummy clock (force DO hi-z for multiple slave SPI) */
+ 357              		.loc 1 180 11 view .LVU79
+ 181:FATFS/Target/user_diskio_spi.c **** }
+ 358              		.loc 1 181 2 view .LVU80
+ 359 000e FF20     		movs	r0, #255
+ 360 0010 FFF7FEFF 		bl	xchg_spi
+ 361              	.LVL30:
+ 182:FATFS/Target/user_diskio_spi.c **** 
+ 362              		.loc 1 182 1 is_stmt 0 view .LVU81
+ 363 0014 08BD     		pop	{r3, pc}
+ 364              	.L27:
+ 365 0016 00BF     		.align	2
+ 366              	.L26:
+ 367 0018 00040048 		.word	1207960576
+ 368              		.cfi_endproc
+ 369              	.LFE138:
+ 371              		.section	.text.spiselect,"ax",%progbits
+ 372              		.align	1
+ 373              		.syntax unified
+ 374              		.thumb
+ 375              		.thumb_func
+ 376              		.fpu fpv4-sp-d16
+ 378              	spiselect:
+ 379              	.LFB139:
+ 189:FATFS/Target/user_diskio_spi.c **** 	CS_LOW();		/* Set CS# low */
+ 380              		.loc 1 189 1 is_stmt 1 view -0
+ 381              		.cfi_startproc
+ 382              		@ args = 0, pretend = 0, frame = 0
+ 383              		@ frame_needed = 0, uses_anonymous_args = 0
+ 384 0000 10B5     		push	{r4, lr}
+ 385              	.LCFI8:
+ 386              		.cfi_def_cfa_offset 8
+ 387              		.cfi_offset 4, -8
+ 388              		.cfi_offset 14, -4
+ 190:FATFS/Target/user_diskio_spi.c **** 	xchg_spi(0xFF); /* Dummy clock (force DO enabled) */
+ 389              		.loc 1 190 2 view .LVU83
+ 390 0002 0022     		movs	r2, #0
+ 391 0004 4FF48051 		mov	r1, #4096
+ 392 0008 0848     		ldr	r0, .L33
+ 393 000a FFF7FEFF 		bl	HAL_GPIO_WritePin
+ 394              	.LVL31:
+ 190:FATFS/Target/user_diskio_spi.c **** 	xchg_spi(0xFF); /* Dummy clock (force DO enabled) */
+ARM GAS  C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s 			page 13
+
+
+ 395              		.loc 1 190 10 view .LVU84
+ 191:FATFS/Target/user_diskio_spi.c **** 	if (wait_ready(500))
+ 396              		.loc 1 191 2 view .LVU85
+ 397 000e FF20     		movs	r0, #255
+ 398 0010 FFF7FEFF 		bl	xchg_spi
+ 399              	.LVL32:
+ 192:FATFS/Target/user_diskio_spi.c **** 		return 1; /* Wait for card ready */
+ 400              		.loc 1 192 2 view .LVU86
+ 192:FATFS/Target/user_diskio_spi.c **** 		return 1; /* Wait for card ready */
+ 401              		.loc 1 192 6 is_stmt 0 view .LVU87
+ 402 0014 4FF4FA70 		mov	r0, #500
+ 403 0018 FFF7FEFF 		bl	wait_ready
+ 404              	.LVL33:
+ 192:FATFS/Target/user_diskio_spi.c **** 		return 1; /* Wait for card ready */
+ 405              		.loc 1 192 5 view .LVU88
+ 406 001c 10B1     		cbz	r0, .L32
+ 193:FATFS/Target/user_diskio_spi.c **** 
+ 407              		.loc 1 193 10 view .LVU89
+ 408 001e 0124     		movs	r4, #1
+ 409              	.L28:
+ 197:FATFS/Target/user_diskio_spi.c **** 
+ 410              		.loc 1 197 1 view .LVU90
+ 411 0020 2046     		mov	r0, r4
+ 412 0022 10BD     		pop	{r4, pc}
+ 413              	.L32:
+ 414 0024 0446     		mov	r4, r0
+ 195:FATFS/Target/user_diskio_spi.c **** 	return 0; /* Timeout */
+ 415              		.loc 1 195 2 is_stmt 1 view .LVU91
+ 416 0026 FFF7FEFF 		bl	despiselect
+ 417              	.LVL34:
+ 196:FATFS/Target/user_diskio_spi.c **** }
+ 418              		.loc 1 196 2 view .LVU92
+ 196:FATFS/Target/user_diskio_spi.c **** }
+ 419              		.loc 1 196 9 is_stmt 0 view .LVU93
+ 420 002a F9E7     		b	.L28
+ 421              	.L34:
+ 422              		.align	2
+ 423              	.L33:
+ 424 002c 00040048 		.word	1207960576
+ 425              		.cfi_endproc
+ 426              	.LFE139:
+ 428              		.section	.text.send_cmd,"ax",%progbits
+ 429              		.align	1
+ 430              		.syntax unified
+ 431              		.thumb
+ 432              		.thumb_func
+ 433              		.fpu fpv4-sp-d16
+ 435              	send_cmd:
+ 436              	.LVL35:
+ 437              	.LFB142:
+ 254:FATFS/Target/user_diskio_spi.c **** #endif
+ 255:FATFS/Target/user_diskio_spi.c **** 
+ 256:FATFS/Target/user_diskio_spi.c **** /*-----------------------------------------------------------------------*/
+ 257:FATFS/Target/user_diskio_spi.c **** /* Send a command packet to the MMC                                      */
+ 258:FATFS/Target/user_diskio_spi.c **** /*-----------------------------------------------------------------------*/
+ 259:FATFS/Target/user_diskio_spi.c **** 
+ 260:FATFS/Target/user_diskio_spi.c **** static BYTE send_cmd(		   /* Return value: R1 resp (bit7==1:Failed to send) */
+ARM GAS  C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s 			page 14
+
+
+ 261:FATFS/Target/user_diskio_spi.c **** 					 BYTE cmd, /* Command index */
+ 262:FATFS/Target/user_diskio_spi.c **** 					 DWORD arg /* Argument */
+ 263:FATFS/Target/user_diskio_spi.c **** )
+ 264:FATFS/Target/user_diskio_spi.c **** {
+ 438              		.loc 1 264 1 is_stmt 1 view -0
+ 439              		.cfi_startproc
+ 440              		@ args = 0, pretend = 0, frame = 0
+ 441              		@ frame_needed = 0, uses_anonymous_args = 0
+ 442              		.loc 1 264 1 is_stmt 0 view .LVU95
+ 443 0000 38B5     		push	{r3, r4, r5, lr}
+ 444              	.LCFI9:
+ 445              		.cfi_def_cfa_offset 16
+ 446              		.cfi_offset 3, -16
+ 447              		.cfi_offset 4, -12
+ 448              		.cfi_offset 5, -8
+ 449              		.cfi_offset 14, -4
+ 450 0002 0446     		mov	r4, r0
+ 451 0004 0D46     		mov	r5, r1
+ 265:FATFS/Target/user_diskio_spi.c **** 	BYTE n, res;
+ 452              		.loc 1 265 2 is_stmt 1 view .LVU96
+ 266:FATFS/Target/user_diskio_spi.c **** 
+ 267:FATFS/Target/user_diskio_spi.c **** 	if (cmd & 0x80)
+ 453              		.loc 1 267 2 view .LVU97
+ 454              		.loc 1 267 5 is_stmt 0 view .LVU98
+ 455 0006 10F0800F 		tst	r0, #128
+ 456 000a 2CD1     		bne	.L47
+ 457              	.LVL36:
+ 458              	.L36:
+ 268:FATFS/Target/user_diskio_spi.c **** 	{ /* Send a CMD55 prior to ACMD<n> */
+ 269:FATFS/Target/user_diskio_spi.c **** 		cmd &= 0x7F;
+ 270:FATFS/Target/user_diskio_spi.c **** 		res = send_cmd(CMD55, 0);
+ 271:FATFS/Target/user_diskio_spi.c **** 		if (res > 1)
+ 272:FATFS/Target/user_diskio_spi.c **** 			return res;
+ 273:FATFS/Target/user_diskio_spi.c **** 	}
+ 274:FATFS/Target/user_diskio_spi.c **** 
+ 275:FATFS/Target/user_diskio_spi.c **** 	/* Select the card and wait for ready except to stop multiple block read */
+ 276:FATFS/Target/user_diskio_spi.c **** 	if (cmd != CMD12)
+ 459              		.loc 1 276 2 is_stmt 1 view .LVU99
+ 460              		.loc 1 276 5 is_stmt 0 view .LVU100
+ 461 000c 0C2C     		cmp	r4, #12
+ 462 000e 04D0     		beq	.L38
+ 277:FATFS/Target/user_diskio_spi.c **** 	{
+ 278:FATFS/Target/user_diskio_spi.c **** 		despiselect();
+ 463              		.loc 1 278 3 is_stmt 1 view .LVU101
+ 464 0010 FFF7FEFF 		bl	despiselect
+ 465              	.LVL37:
+ 279:FATFS/Target/user_diskio_spi.c **** 		if (!spiselect())
+ 466              		.loc 1 279 3 view .LVU102
+ 467              		.loc 1 279 8 is_stmt 0 view .LVU103
+ 468 0014 FFF7FEFF 		bl	spiselect
+ 469              	.LVL38:
+ 470              		.loc 1 279 6 view .LVU104
+ 471 0018 B0B3     		cbz	r0, .L43
+ 472              	.L38:
+ 280:FATFS/Target/user_diskio_spi.c **** 			return 0xFF;
+ 281:FATFS/Target/user_diskio_spi.c **** 	}
+ 282:FATFS/Target/user_diskio_spi.c **** 
+ARM GAS  C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s 			page 15
+
+
+ 283:FATFS/Target/user_diskio_spi.c **** 	/* Send command packet */
+ 284:FATFS/Target/user_diskio_spi.c **** 	xchg_spi(0x40 | cmd);		 /* Start + command index */
+ 473              		.loc 1 284 2 is_stmt 1 view .LVU105
+ 474 001a 44F04000 		orr	r0, r4, #64
+ 475 001e FFF7FEFF 		bl	xchg_spi
+ 476              	.LVL39:
+ 285:FATFS/Target/user_diskio_spi.c **** 	xchg_spi((BYTE)(arg >> 24)); /* Argument[31..24] */
+ 477              		.loc 1 285 2 view .LVU106
+ 478 0022 280E     		lsrs	r0, r5, #24
+ 479 0024 FFF7FEFF 		bl	xchg_spi
+ 480              	.LVL40:
+ 286:FATFS/Target/user_diskio_spi.c **** 	xchg_spi((BYTE)(arg >> 16)); /* Argument[23..16] */
+ 481              		.loc 1 286 2 view .LVU107
+ 482 0028 C5F30740 		ubfx	r0, r5, #16, #8
+ 483 002c FFF7FEFF 		bl	xchg_spi
+ 484              	.LVL41:
+ 287:FATFS/Target/user_diskio_spi.c **** 	xchg_spi((BYTE)(arg >> 8));	 /* Argument[15..8] */
+ 485              		.loc 1 287 2 view .LVU108
+ 486 0030 C5F30720 		ubfx	r0, r5, #8, #8
+ 487 0034 FFF7FEFF 		bl	xchg_spi
+ 488              	.LVL42:
+ 288:FATFS/Target/user_diskio_spi.c **** 	xchg_spi((BYTE)arg);		 /* Argument[7..0] */
+ 489              		.loc 1 288 2 view .LVU109
+ 490 0038 E8B2     		uxtb	r0, r5
+ 491 003a FFF7FEFF 		bl	xchg_spi
+ 492              	.LVL43:
+ 289:FATFS/Target/user_diskio_spi.c **** 	n = 0x01;					 /* Dummy CRC + Stop */
+ 493              		.loc 1 289 2 view .LVU110
+ 290:FATFS/Target/user_diskio_spi.c **** 	if (cmd == CMD0)
+ 494              		.loc 1 290 2 view .LVU111
+ 495              		.loc 1 290 5 is_stmt 0 view .LVU112
+ 496 003e DCB1     		cbz	r4, .L44
+ 289:FATFS/Target/user_diskio_spi.c **** 	n = 0x01;					 /* Dummy CRC + Stop */
+ 497              		.loc 1 289 4 view .LVU113
+ 498 0040 0120     		movs	r0, #1
+ 499              	.L39:
+ 500              	.LVL44:
+ 291:FATFS/Target/user_diskio_spi.c **** 		n = 0x95; /* Valid CRC for CMD0(0) */
+ 292:FATFS/Target/user_diskio_spi.c **** 	if (cmd == CMD8)
+ 501              		.loc 1 292 2 is_stmt 1 view .LVU114
+ 502              		.loc 1 292 5 is_stmt 0 view .LVU115
+ 503 0042 082C     		cmp	r4, #8
+ 504 0044 1AD0     		beq	.L48
+ 505              	.LVL45:
+ 506              	.L40:
+ 293:FATFS/Target/user_diskio_spi.c **** 		n = 0x87; /* Valid CRC for CMD8(0x1AA) */
+ 294:FATFS/Target/user_diskio_spi.c **** 	xchg_spi(n);
+ 507              		.loc 1 294 2 is_stmt 1 view .LVU116
+ 508 0046 FFF7FEFF 		bl	xchg_spi
+ 509              	.LVL46:
+ 295:FATFS/Target/user_diskio_spi.c **** 
+ 296:FATFS/Target/user_diskio_spi.c **** 	/* Receive command resp */
+ 297:FATFS/Target/user_diskio_spi.c **** 	if (cmd == CMD12)
+ 510              		.loc 1 297 2 view .LVU117
+ 511              		.loc 1 297 5 is_stmt 0 view .LVU118
+ 512 004a 0C2C     		cmp	r4, #12
+ 513 004c 18D0     		beq	.L49
+ARM GAS  C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s 			page 16
+
+
+ 514              	.L41:
+ 293:FATFS/Target/user_diskio_spi.c **** 		n = 0x87; /* Valid CRC for CMD8(0x1AA) */
+ 515              		.loc 1 293 5 discriminator 2 view .LVU119
+ 516 004e 0A24     		movs	r4, #10
+ 517              	.LVL47:
+ 518              	.L42:
+ 298:FATFS/Target/user_diskio_spi.c **** 		xchg_spi(0xFF); /* Diacard following one byte when CMD12 */
+ 299:FATFS/Target/user_diskio_spi.c **** 	n = 10;				/* Wait for response (10 bytes max) */
+ 300:FATFS/Target/user_diskio_spi.c **** 	do
+ 519              		.loc 1 300 2 is_stmt 1 discriminator 2 view .LVU120
+ 301:FATFS/Target/user_diskio_spi.c **** 	{
+ 302:FATFS/Target/user_diskio_spi.c **** 		res = xchg_spi(0xFF);
+ 520              		.loc 1 302 3 discriminator 2 view .LVU121
+ 521              		.loc 1 302 9 is_stmt 0 discriminator 2 view .LVU122
+ 522 0050 FF20     		movs	r0, #255
+ 523 0052 FFF7FEFF 		bl	xchg_spi
+ 524              	.LVL48:
+ 303:FATFS/Target/user_diskio_spi.c **** 	} while ((res & 0x80) && --n);
+ 525              		.loc 1 303 10 is_stmt 1 discriminator 2 view .LVU123
+ 526              		.loc 1 303 2 is_stmt 0 discriminator 2 view .LVU124
+ 527 0056 10F0800F 		tst	r0, #128
+ 528 005a 03D0     		beq	.L37
+ 529              		.loc 1 303 24 discriminator 1 view .LVU125
+ 530 005c 631E     		subs	r3, r4, #1
+ 531              	.LVL49:
+ 532              		.loc 1 303 24 discriminator 1 view .LVU126
+ 533 005e 13F0FF04 		ands	r4, r3, #255
+ 534 0062 F5D1     		bne	.L42
+ 535              	.LVL50:
+ 536              	.L37:
+ 304:FATFS/Target/user_diskio_spi.c **** 
+ 305:FATFS/Target/user_diskio_spi.c **** 	return res; /* Return received response */
+ 306:FATFS/Target/user_diskio_spi.c **** }
+ 537              		.loc 1 306 1 view .LVU127
+ 538 0064 38BD     		pop	{r3, r4, r5, pc}
+ 539              	.LVL51:
+ 540              	.L47:
+ 269:FATFS/Target/user_diskio_spi.c **** 		res = send_cmd(CMD55, 0);
+ 541              		.loc 1 269 3 is_stmt 1 view .LVU128
+ 269:FATFS/Target/user_diskio_spi.c **** 		res = send_cmd(CMD55, 0);
+ 542              		.loc 1 269 7 is_stmt 0 view .LVU129
+ 543 0066 00F07F04 		and	r4, r0, #127
+ 544              	.LVL52:
+ 270:FATFS/Target/user_diskio_spi.c **** 		if (res > 1)
+ 545              		.loc 1 270 3 is_stmt 1 view .LVU130
+ 270:FATFS/Target/user_diskio_spi.c **** 		if (res > 1)
+ 546              		.loc 1 270 9 is_stmt 0 view .LVU131
+ 547 006a 0021     		movs	r1, #0
+ 548              	.LVL53:
+ 270:FATFS/Target/user_diskio_spi.c **** 		if (res > 1)
+ 549              		.loc 1 270 9 view .LVU132
+ 550 006c 3720     		movs	r0, #55
+ 551 006e FFF7C7FF 		bl	send_cmd
+ 552              	.LVL54:
+ 271:FATFS/Target/user_diskio_spi.c **** 			return res;
+ 553              		.loc 1 271 3 is_stmt 1 view .LVU133
+ 271:FATFS/Target/user_diskio_spi.c **** 			return res;
+ARM GAS  C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s 			page 17
+
+
+ 554              		.loc 1 271 6 is_stmt 0 view .LVU134
+ 555 0072 0128     		cmp	r0, #1
+ 556 0074 CAD9     		bls	.L36
+ 557 0076 F5E7     		b	.L37
+ 558              	.LVL55:
+ 559              	.L44:
+ 291:FATFS/Target/user_diskio_spi.c **** 	if (cmd == CMD8)
+ 560              		.loc 1 291 5 view .LVU135
+ 561 0078 9520     		movs	r0, #149
+ 562 007a E2E7     		b	.L39
+ 563              	.LVL56:
+ 564              	.L48:
+ 293:FATFS/Target/user_diskio_spi.c **** 	xchg_spi(n);
+ 565              		.loc 1 293 5 view .LVU136
+ 566 007c 8720     		movs	r0, #135
+ 567              	.LVL57:
+ 293:FATFS/Target/user_diskio_spi.c **** 	xchg_spi(n);
+ 568              		.loc 1 293 5 view .LVU137
+ 569 007e E2E7     		b	.L40
+ 570              	.L49:
+ 298:FATFS/Target/user_diskio_spi.c **** 	n = 10;				/* Wait for response (10 bytes max) */
+ 571              		.loc 1 298 3 is_stmt 1 view .LVU138
+ 572 0080 FF20     		movs	r0, #255
+ 573 0082 FFF7FEFF 		bl	xchg_spi
+ 574              	.LVL58:
+ 575 0086 E2E7     		b	.L41
+ 576              	.L43:
+ 280:FATFS/Target/user_diskio_spi.c **** 	}
+ 577              		.loc 1 280 11 is_stmt 0 view .LVU139
+ 578 0088 FF20     		movs	r0, #255
+ 579 008a EBE7     		b	.L37
+ 580              		.cfi_endproc
+ 581              	.LFE142:
+ 583              		.section	.text.SPI_Timer_On,"ax",%progbits
+ 584              		.align	1
+ 585              		.global	SPI_Timer_On
+ 586              		.syntax unified
+ 587              		.thumb
+ 588              		.thumb_func
+ 589              		.fpu fpv4-sp-d16
+ 591              	SPI_Timer_On:
+ 592              	.LVL59:
+ 593              	.LFB132:
+  99:FATFS/Target/user_diskio_spi.c **** 	spiTimerTickStart = HAL_GetTick();
+ 594              		.loc 1 99 1 is_stmt 1 view -0
+ 595              		.cfi_startproc
+ 596              		@ args = 0, pretend = 0, frame = 0
+ 597              		@ frame_needed = 0, uses_anonymous_args = 0
+  99:FATFS/Target/user_diskio_spi.c **** 	spiTimerTickStart = HAL_GetTick();
+ 598              		.loc 1 99 1 is_stmt 0 view .LVU141
+ 599 0000 10B5     		push	{r4, lr}
+ 600              	.LCFI10:
+ 601              		.cfi_def_cfa_offset 8
+ 602              		.cfi_offset 4, -8
+ 603              		.cfi_offset 14, -4
+ 604 0002 0446     		mov	r4, r0
+ 100:FATFS/Target/user_diskio_spi.c **** 	spiTimerTickDelay = waitTicks;
+ARM GAS  C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s 			page 18
+
+
+ 605              		.loc 1 100 2 is_stmt 1 view .LVU142
+ 100:FATFS/Target/user_diskio_spi.c **** 	spiTimerTickDelay = waitTicks;
+ 606              		.loc 1 100 22 is_stmt 0 view .LVU143
+ 607 0004 FFF7FEFF 		bl	HAL_GetTick
+ 608              	.LVL60:
+ 100:FATFS/Target/user_diskio_spi.c **** 	spiTimerTickDelay = waitTicks;
+ 609              		.loc 1 100 20 view .LVU144
+ 610 0008 024B     		ldr	r3, .L52
+ 611 000a 1860     		str	r0, [r3]
+ 101:FATFS/Target/user_diskio_spi.c **** }
+ 612              		.loc 1 101 2 is_stmt 1 view .LVU145
+ 101:FATFS/Target/user_diskio_spi.c **** }
+ 613              		.loc 1 101 20 is_stmt 0 view .LVU146
+ 614 000c 024B     		ldr	r3, .L52+4
+ 615 000e 1C60     		str	r4, [r3]
+ 102:FATFS/Target/user_diskio_spi.c **** 
+ 616              		.loc 1 102 1 view .LVU147
+ 617 0010 10BD     		pop	{r4, pc}
+ 618              	.LVL61:
+ 619              	.L53:
+ 102:FATFS/Target/user_diskio_spi.c **** 
+ 620              		.loc 1 102 1 view .LVU148
+ 621 0012 00BF     		.align	2
+ 622              	.L52:
+ 623 0014 00000000 		.word	.LANCHOR0
+ 624 0018 00000000 		.word	.LANCHOR1
+ 625              		.cfi_endproc
+ 626              	.LFE132:
+ 628              		.section	.text.SPI_Timer_Status,"ax",%progbits
+ 629              		.align	1
+ 630              		.global	SPI_Timer_Status
+ 631              		.syntax unified
+ 632              		.thumb
+ 633              		.thumb_func
+ 634              		.fpu fpv4-sp-d16
+ 636              	SPI_Timer_Status:
+ 637              	.LFB133:
+ 105:FATFS/Target/user_diskio_spi.c **** 	return ((HAL_GetTick() - spiTimerTickStart) < spiTimerTickDelay);
+ 638              		.loc 1 105 1 is_stmt 1 view -0
+ 639              		.cfi_startproc
+ 640              		@ args = 0, pretend = 0, frame = 0
+ 641              		@ frame_needed = 0, uses_anonymous_args = 0
+ 642 0000 08B5     		push	{r3, lr}
+ 643              	.LCFI11:
+ 644              		.cfi_def_cfa_offset 8
+ 645              		.cfi_offset 3, -8
+ 646              		.cfi_offset 14, -4
+ 106:FATFS/Target/user_diskio_spi.c **** }
+ 647              		.loc 1 106 2 view .LVU150
+ 106:FATFS/Target/user_diskio_spi.c **** }
+ 648              		.loc 1 106 11 is_stmt 0 view .LVU151
+ 649 0002 FFF7FEFF 		bl	HAL_GetTick
+ 650              	.LVL62:
+ 106:FATFS/Target/user_diskio_spi.c **** }
+ 651              		.loc 1 106 25 view .LVU152
+ 652 0006 054B     		ldr	r3, .L56
+ 653 0008 1B68     		ldr	r3, [r3]
+ARM GAS  C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s 			page 19
+
+
+ 654 000a C01A     		subs	r0, r0, r3
+ 106:FATFS/Target/user_diskio_spi.c **** }
+ 655              		.loc 1 106 46 view .LVU153
+ 656 000c 044B     		ldr	r3, .L56+4
+ 657 000e 1B68     		ldr	r3, [r3]
+ 107:FATFS/Target/user_diskio_spi.c **** 
+ 658              		.loc 1 107 1 view .LVU154
+ 659 0010 9842     		cmp	r0, r3
+ 660 0012 2CBF     		ite	cs
+ 661 0014 0020     		movcs	r0, #0
+ 662 0016 0120     		movcc	r0, #1
+ 663 0018 08BD     		pop	{r3, pc}
+ 664              	.L57:
+ 665 001a 00BF     		.align	2
+ 666              	.L56:
+ 667 001c 00000000 		.word	.LANCHOR0
+ 668 0020 00000000 		.word	.LANCHOR1
+ 669              		.cfi_endproc
+ 670              	.LFE133:
+ 672              		.section	.text.rcvr_datablock,"ax",%progbits
+ 673              		.align	1
+ 674              		.syntax unified
+ 675              		.thumb
+ 676              		.thumb_func
+ 677              		.fpu fpv4-sp-d16
+ 679              	rcvr_datablock:
+ 680              	.LVL63:
+ 681              	.LFB140:
+ 207:FATFS/Target/user_diskio_spi.c **** 	BYTE token;
+ 682              		.loc 1 207 1 is_stmt 1 view -0
+ 683              		.cfi_startproc
+ 684              		@ args = 0, pretend = 0, frame = 0
+ 685              		@ frame_needed = 0, uses_anonymous_args = 0
+ 207:FATFS/Target/user_diskio_spi.c **** 	BYTE token;
+ 686              		.loc 1 207 1 is_stmt 0 view .LVU156
+ 687 0000 70B5     		push	{r4, r5, r6, lr}
+ 688              	.LCFI12:
+ 689              		.cfi_def_cfa_offset 16
+ 690              		.cfi_offset 4, -16
+ 691              		.cfi_offset 5, -12
+ 692              		.cfi_offset 6, -8
+ 693              		.cfi_offset 14, -4
+ 694 0002 0546     		mov	r5, r0
+ 695 0004 0E46     		mov	r6, r1
+ 208:FATFS/Target/user_diskio_spi.c **** 
+ 696              		.loc 1 208 2 is_stmt 1 view .LVU157
+ 210:FATFS/Target/user_diskio_spi.c **** 	do
+ 697              		.loc 1 210 2 view .LVU158
+ 698 0006 C820     		movs	r0, #200
+ 699              	.LVL64:
+ 210:FATFS/Target/user_diskio_spi.c **** 	do
+ 700              		.loc 1 210 2 is_stmt 0 view .LVU159
+ 701 0008 FFF7FEFF 		bl	SPI_Timer_On
+ 702              	.LVL65:
+ 703              	.L60:
+ 211:FATFS/Target/user_diskio_spi.c **** 	{ /* Wait for DataStart token in timeout of 200ms */
+ 704              		.loc 1 211 2 is_stmt 1 discriminator 2 view .LVU160
+ARM GAS  C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s 			page 20
+
+
+ 213:FATFS/Target/user_diskio_spi.c **** 		/* This loop will take a time. Insert rot_rdq() here for multitask envilonment. */
+ 705              		.loc 1 213 3 discriminator 2 view .LVU161
+ 213:FATFS/Target/user_diskio_spi.c **** 		/* This loop will take a time. Insert rot_rdq() here for multitask envilonment. */
+ 706              		.loc 1 213 11 is_stmt 0 discriminator 2 view .LVU162
+ 707 000c FF20     		movs	r0, #255
+ 708 000e FFF7FEFF 		bl	xchg_spi
+ 709              	.LVL66:
+ 710 0012 0446     		mov	r4, r0
+ 711              	.LVL67:
+ 215:FATFS/Target/user_diskio_spi.c **** 	if (token != 0xFE)
+ 712              		.loc 1 215 10 is_stmt 1 discriminator 2 view .LVU163
+ 215:FATFS/Target/user_diskio_spi.c **** 	if (token != 0xFE)
+ 713              		.loc 1 215 2 is_stmt 0 discriminator 2 view .LVU164
+ 714 0014 FF28     		cmp	r0, #255
+ 715 0016 03D1     		bne	.L59
+ 215:FATFS/Target/user_diskio_spi.c **** 	if (token != 0xFE)
+ 716              		.loc 1 215 30 discriminator 1 view .LVU165
+ 717 0018 FFF7FEFF 		bl	SPI_Timer_Status
+ 718              	.LVL68:
+ 215:FATFS/Target/user_diskio_spi.c **** 	if (token != 0xFE)
+ 719              		.loc 1 215 27 discriminator 1 view .LVU166
+ 720 001c 0028     		cmp	r0, #0
+ 721 001e F5D1     		bne	.L60
+ 722              	.L59:
+ 216:FATFS/Target/user_diskio_spi.c **** 		return 0; /* Function fails if invalid DataStart token or timeout */
+ 723              		.loc 1 216 2 is_stmt 1 view .LVU167
+ 216:FATFS/Target/user_diskio_spi.c **** 		return 0; /* Function fails if invalid DataStart token or timeout */
+ 724              		.loc 1 216 5 is_stmt 0 view .LVU168
+ 725 0020 FE2C     		cmp	r4, #254
+ 726 0022 01D0     		beq	.L64
+ 217:FATFS/Target/user_diskio_spi.c **** 
+ 727              		.loc 1 217 10 view .LVU169
+ 728 0024 0020     		movs	r0, #0
+ 729              	.L58:
+ 224:FATFS/Target/user_diskio_spi.c **** 
+ 730              		.loc 1 224 1 view .LVU170
+ 731 0026 70BD     		pop	{r4, r5, r6, pc}
+ 732              	.LVL69:
+ 733              	.L64:
+ 219:FATFS/Target/user_diskio_spi.c **** 	xchg_spi(0xFF);
+ 734              		.loc 1 219 2 is_stmt 1 view .LVU171
+ 735 0028 3146     		mov	r1, r6
+ 736 002a 2846     		mov	r0, r5
+ 737 002c FFF7FEFF 		bl	rcvr_spi_multi
+ 738              	.LVL70:
+ 220:FATFS/Target/user_diskio_spi.c **** 	xchg_spi(0xFF); /* Discard CRC */
+ 739              		.loc 1 220 2 view .LVU172
+ 740 0030 FF20     		movs	r0, #255
+ 741 0032 FFF7FEFF 		bl	xchg_spi
+ 742              	.LVL71:
+ 221:FATFS/Target/user_diskio_spi.c **** 
+ 743              		.loc 1 221 2 view .LVU173
+ 744 0036 FF20     		movs	r0, #255
+ 745 0038 FFF7FEFF 		bl	xchg_spi
+ 746              	.LVL72:
+ 223:FATFS/Target/user_diskio_spi.c **** }
+ 747              		.loc 1 223 2 view .LVU174
+ARM GAS  C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s 			page 21
+
+
+ 223:FATFS/Target/user_diskio_spi.c **** }
+ 748              		.loc 1 223 9 is_stmt 0 view .LVU175
+ 749 003c 0120     		movs	r0, #1
+ 750 003e F2E7     		b	.L58
+ 751              		.cfi_endproc
+ 752              	.LFE140:
+ 754              		.section	.text.USER_SPI_initialize,"ax",%progbits
+ 755              		.align	1
+ 756              		.global	USER_SPI_initialize
+ 757              		.syntax unified
+ 758              		.thumb
+ 759              		.thumb_func
+ 760              		.fpu fpv4-sp-d16
+ 762              	USER_SPI_initialize:
+ 763              	.LVL73:
+ 764              	.LFB143:
+ 307:FATFS/Target/user_diskio_spi.c **** 
+ 308:FATFS/Target/user_diskio_spi.c **** /*--------------------------------------------------------------------------
+ 309:FATFS/Target/user_diskio_spi.c **** 
+ 310:FATFS/Target/user_diskio_spi.c ****    Public FatFs Functions (wrapped in user_diskio.c)
+ 311:FATFS/Target/user_diskio_spi.c **** 
+ 312:FATFS/Target/user_diskio_spi.c **** ---------------------------------------------------------------------------*/
+ 313:FATFS/Target/user_diskio_spi.c **** 
+ 314:FATFS/Target/user_diskio_spi.c **** // The following functions are defined as inline because they aren't the functions that
+ 315:FATFS/Target/user_diskio_spi.c **** // are passed to FatFs - they are wrapped by autogenerated (non-inline) cubemx template
+ 316:FATFS/Target/user_diskio_spi.c **** // code.
+ 317:FATFS/Target/user_diskio_spi.c **** // If you do not wish to use cubemx, remove the "inline" from these functions here
+ 318:FATFS/Target/user_diskio_spi.c **** // and in the associated .h
+ 319:FATFS/Target/user_diskio_spi.c **** 
+ 320:FATFS/Target/user_diskio_spi.c **** /*-----------------------------------------------------------------------*/
+ 321:FATFS/Target/user_diskio_spi.c **** /* Initialize disk drive                                                 */
+ 322:FATFS/Target/user_diskio_spi.c **** /*-----------------------------------------------------------------------*/
+ 323:FATFS/Target/user_diskio_spi.c **** 
+ 324:FATFS/Target/user_diskio_spi.c **** inline DSTATUS USER_SPI_initialize(
+ 325:FATFS/Target/user_diskio_spi.c **** 	BYTE drv /* Physical drive number (0) */
+ 326:FATFS/Target/user_diskio_spi.c **** )
+ 327:FATFS/Target/user_diskio_spi.c **** {
+ 765              		.loc 1 327 1 is_stmt 1 view -0
+ 766              		.cfi_startproc
+ 767              		@ args = 0, pretend = 0, frame = 8
+ 768              		@ frame_needed = 0, uses_anonymous_args = 0
+ 328:FATFS/Target/user_diskio_spi.c **** 	BYTE n, cmd, ty, ocr[4];
+ 769              		.loc 1 328 2 view .LVU177
+ 329:FATFS/Target/user_diskio_spi.c **** 
+ 330:FATFS/Target/user_diskio_spi.c **** 	if (drv != 0)
+ 770              		.loc 1 330 2 view .LVU178
+ 771              		.loc 1 330 5 is_stmt 0 view .LVU179
+ 772 0000 0028     		cmp	r0, #0
+ 773 0002 40F0AA80 		bne	.L83
+ 331:FATFS/Target/user_diskio_spi.c **** 		return STA_NOINIT; /* Supports only drive 0 */
+ 332:FATFS/Target/user_diskio_spi.c **** 	// assume SPI already init init_spi();	/* Initialize SPI */
+ 333:FATFS/Target/user_diskio_spi.c **** 
+ 334:FATFS/Target/user_diskio_spi.c **** 	if (Stat & STA_NODISK)
+ 774              		.loc 1 334 2 is_stmt 1 view .LVU180
+ 775              		.loc 1 334 11 is_stmt 0 view .LVU181
+ 776 0006 564B     		ldr	r3, .L99
+ 777 0008 1B78     		ldrb	r3, [r3]	@ zero_extendqisi2
+ARM GAS  C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s 			page 22
+
+
+ 778              		.loc 1 334 5 view .LVU182
+ 779 000a 13F0020F 		tst	r3, #2
+ 780 000e 0BD1     		bne	.L93
+ 327:FATFS/Target/user_diskio_spi.c **** 	BYTE n, cmd, ty, ocr[4];
+ 781              		.loc 1 327 1 view .LVU183
+ 782 0010 70B5     		push	{r4, r5, r6, lr}
+ 783              	.LCFI13:
+ 784              		.cfi_def_cfa_offset 16
+ 785              		.cfi_offset 4, -16
+ 786              		.cfi_offset 5, -12
+ 787              		.cfi_offset 6, -8
+ 788              		.cfi_offset 14, -4
+ 789 0012 82B0     		sub	sp, sp, #8
+ 790              	.LCFI14:
+ 791              		.cfi_def_cfa_offset 24
+ 335:FATFS/Target/user_diskio_spi.c **** 		return Stat; /* Is card existing in the soket? */
+ 336:FATFS/Target/user_diskio_spi.c **** 
+ 337:FATFS/Target/user_diskio_spi.c **** 	FCLK_SLOW();
+ 792              		.loc 1 337 2 is_stmt 1 view .LVU184
+ 793 0014 534B     		ldr	r3, .L99+4
+ 794 0016 1A68     		ldr	r2, [r3]
+ 795 0018 1368     		ldr	r3, [r2]
+ 796 001a 23F03803 		bic	r3, r3, #56
+ 797 001e 43F03003 		orr	r3, r3, #48
+ 798 0022 1360     		str	r3, [r2]
+ 799              		.loc 1 337 13 view .LVU185
+ 338:FATFS/Target/user_diskio_spi.c **** 	for (n = 10; n; n--)
+ 800              		.loc 1 338 2 view .LVU186
+ 801              	.LVL74:
+ 802              		.loc 1 338 9 is_stmt 0 view .LVU187
+ 803 0024 0A24     		movs	r4, #10
+ 804              		.loc 1 338 2 view .LVU188
+ 805 0026 08E0     		b	.L68
+ 806              	.LVL75:
+ 807              	.L93:
+ 808              	.LCFI15:
+ 809              		.cfi_def_cfa_offset 0
+ 810              		.cfi_restore 4
+ 811              		.cfi_restore 5
+ 812              		.cfi_restore 6
+ 813              		.cfi_restore 14
+ 335:FATFS/Target/user_diskio_spi.c **** 		return Stat; /* Is card existing in the soket? */
+ 814              		.loc 1 335 3 is_stmt 1 view .LVU189
+ 335:FATFS/Target/user_diskio_spi.c **** 		return Stat; /* Is card existing in the soket? */
+ 815              		.loc 1 335 10 is_stmt 0 view .LVU190
+ 816 0028 4D4B     		ldr	r3, .L99
+ 817 002a 1878     		ldrb	r0, [r3]	@ zero_extendqisi2
+ 818              	.LVL76:
+ 335:FATFS/Target/user_diskio_spi.c **** 		return Stat; /* Is card existing in the soket? */
+ 819              		.loc 1 335 10 view .LVU191
+ 820 002c C0B2     		uxtb	r0, r0
+ 821 002e 7047     		bx	lr
+ 822              	.LVL77:
+ 823              	.L69:
+ 824              	.LCFI16:
+ 825              		.cfi_def_cfa_offset 24
+ 826              		.cfi_offset 4, -16
+ARM GAS  C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s 			page 23
+
+
+ 827              		.cfi_offset 5, -12
+ 828              		.cfi_offset 6, -8
+ 829              		.cfi_offset 14, -4
+ 339:FATFS/Target/user_diskio_spi.c **** 		xchg_spi(0xFF); /* Send 80 dummy clocks */
+ 830              		.loc 1 339 3 is_stmt 1 discriminator 3 view .LVU192
+ 831 0030 FF20     		movs	r0, #255
+ 832 0032 FFF7FEFF 		bl	xchg_spi
+ 833              	.LVL78:
+ 338:FATFS/Target/user_diskio_spi.c **** 	for (n = 10; n; n--)
+ 834              		.loc 1 338 18 discriminator 3 view .LVU193
+ 338:FATFS/Target/user_diskio_spi.c **** 	for (n = 10; n; n--)
+ 835              		.loc 1 338 19 is_stmt 0 discriminator 3 view .LVU194
+ 836 0036 013C     		subs	r4, r4, #1
+ 837              	.LVL79:
+ 338:FATFS/Target/user_diskio_spi.c **** 	for (n = 10; n; n--)
+ 838              		.loc 1 338 19 discriminator 3 view .LVU195
+ 839 0038 E4B2     		uxtb	r4, r4
+ 840              	.LVL80:
+ 841              	.L68:
+ 338:FATFS/Target/user_diskio_spi.c **** 	for (n = 10; n; n--)
+ 842              		.loc 1 338 15 is_stmt 1 discriminator 1 view .LVU196
+ 338:FATFS/Target/user_diskio_spi.c **** 	for (n = 10; n; n--)
+ 843              		.loc 1 338 2 is_stmt 0 discriminator 1 view .LVU197
+ 844 003a 002C     		cmp	r4, #0
+ 845 003c F8D1     		bne	.L69
+ 340:FATFS/Target/user_diskio_spi.c **** 
+ 341:FATFS/Target/user_diskio_spi.c **** 	ty = 0;
+ 846              		.loc 1 341 2 is_stmt 1 view .LVU198
+ 847              	.LVL81:
+ 342:FATFS/Target/user_diskio_spi.c **** 	if (send_cmd(CMD0, 0) == 1)
+ 848              		.loc 1 342 2 view .LVU199
+ 849              		.loc 1 342 6 is_stmt 0 view .LVU200
+ 850 003e 0021     		movs	r1, #0
+ 851 0040 0846     		mov	r0, r1
+ 852 0042 FFF7FEFF 		bl	send_cmd
+ 853              	.LVL82:
+ 854 0046 0546     		mov	r5, r0
+ 855              		.loc 1 342 5 view .LVU201
+ 856 0048 0128     		cmp	r0, #1
+ 857 004a 17D0     		beq	.L94
+ 858              	.LVL83:
+ 859              	.L70:
+ 343:FATFS/Target/user_diskio_spi.c **** 	{						/* Put the card SPI/Idle state */
+ 344:FATFS/Target/user_diskio_spi.c **** 		SPI_Timer_On(1000); /* Initialization timeout = 1 sec */
+ 345:FATFS/Target/user_diskio_spi.c **** 		if (send_cmd(CMD8, 0x1AA) == 1)
+ 346:FATFS/Target/user_diskio_spi.c **** 		{ /* SDv2? */
+ 347:FATFS/Target/user_diskio_spi.c **** 			for (n = 0; n < 4; n++)
+ 348:FATFS/Target/user_diskio_spi.c **** 				ocr[n] = xchg_spi(0xFF); /* Get 32 bit return value of R7 resp */
+ 349:FATFS/Target/user_diskio_spi.c **** 			if (ocr[2] == 0x01 && ocr[3] == 0xAA)
+ 350:FATFS/Target/user_diskio_spi.c **** 			{ /* Is the card supports vcc of 2.7-3.6V? */
+ 351:FATFS/Target/user_diskio_spi.c **** 				while (SPI_Timer_Status() && send_cmd(ACMD41, 1UL << 30))
+ 352:FATFS/Target/user_diskio_spi.c **** 					; /* Wait for end of initialization with ACMD41(HCS) */
+ 353:FATFS/Target/user_diskio_spi.c **** 				if (SPI_Timer_Status() && send_cmd(CMD58, 0) == 0)
+ 354:FATFS/Target/user_diskio_spi.c **** 				{ /* Check CCS bit in the OCR */
+ 355:FATFS/Target/user_diskio_spi.c **** 					for (n = 0; n < 4; n++)
+ 356:FATFS/Target/user_diskio_spi.c **** 						ocr[n] = xchg_spi(0xFF);
+ 357:FATFS/Target/user_diskio_spi.c **** 					ty = (ocr[0] & 0x40) ? CT_SD2 | CT_BLOCK : CT_SD2; /* Card id SDv2 */
+ARM GAS  C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s 			page 24
+
+
+ 358:FATFS/Target/user_diskio_spi.c **** 				}
+ 359:FATFS/Target/user_diskio_spi.c **** 			}
+ 360:FATFS/Target/user_diskio_spi.c **** 		}
+ 361:FATFS/Target/user_diskio_spi.c **** 		else
+ 362:FATFS/Target/user_diskio_spi.c **** 		{ /* Not SDv2 card */
+ 363:FATFS/Target/user_diskio_spi.c **** 			if (send_cmd(ACMD41, 0) <= 1)
+ 364:FATFS/Target/user_diskio_spi.c **** 			{ /* SDv1 or MMC? */
+ 365:FATFS/Target/user_diskio_spi.c **** 				ty = CT_SD1;
+ 366:FATFS/Target/user_diskio_spi.c **** 				cmd = ACMD41; /* SDv1 (ACMD41(0)) */
+ 367:FATFS/Target/user_diskio_spi.c **** 			}
+ 368:FATFS/Target/user_diskio_spi.c **** 			else
+ 369:FATFS/Target/user_diskio_spi.c **** 			{
+ 370:FATFS/Target/user_diskio_spi.c **** 				ty = CT_MMC;
+ 371:FATFS/Target/user_diskio_spi.c **** 				cmd = CMD1; /* MMCv3 (CMD1(0)) */
+ 372:FATFS/Target/user_diskio_spi.c **** 			}
+ 373:FATFS/Target/user_diskio_spi.c **** 			while (SPI_Timer_Status() && send_cmd(cmd, 0))
+ 374:FATFS/Target/user_diskio_spi.c **** 				;												  /* Wait for end of initialization */
+ 375:FATFS/Target/user_diskio_spi.c **** 			if (!SPI_Timer_Status() || send_cmd(CMD16, 512) != 0) /* Set block length: 512 */
+ 376:FATFS/Target/user_diskio_spi.c **** 				ty = 0;
+ 377:FATFS/Target/user_diskio_spi.c **** 		}
+ 378:FATFS/Target/user_diskio_spi.c **** 	}
+ 379:FATFS/Target/user_diskio_spi.c **** 	CardType = ty; /* Card type */
+ 860              		.loc 1 379 2 is_stmt 1 view .LVU202
+ 861              		.loc 1 379 11 is_stmt 0 view .LVU203
+ 862 004c 464B     		ldr	r3, .L99+8
+ 863 004e 1C70     		strb	r4, [r3]
+ 380:FATFS/Target/user_diskio_spi.c **** 	despiselect();
+ 864              		.loc 1 380 2 is_stmt 1 view .LVU204
+ 865 0050 FFF7FEFF 		bl	despiselect
+ 866              	.LVL84:
+ 381:FATFS/Target/user_diskio_spi.c **** 
+ 382:FATFS/Target/user_diskio_spi.c **** 	if (ty)
+ 867              		.loc 1 382 2 view .LVU205
+ 868              		.loc 1 382 5 is_stmt 0 view .LVU206
+ 869 0054 002C     		cmp	r4, #0
+ 870 0056 7CD0     		beq	.L81
+ 383:FATFS/Target/user_diskio_spi.c **** 	{						 /* OK */
+ 384:FATFS/Target/user_diskio_spi.c **** 		FCLK_FAST();		 /* Set fast clock */
+ 871              		.loc 1 384 3 is_stmt 1 view .LVU207
+ 872 0058 424B     		ldr	r3, .L99+4
+ 873 005a 1A68     		ldr	r2, [r3]
+ 874 005c 1368     		ldr	r3, [r2]
+ 875 005e 23F03803 		bic	r3, r3, #56
+ 876 0062 43F01003 		orr	r3, r3, #16
+ 877 0066 1360     		str	r3, [r2]
+ 878              		.loc 1 384 14 view .LVU208
+ 385:FATFS/Target/user_diskio_spi.c **** 		Stat &= ~STA_NOINIT; /* Clear STA_NOINIT flag */
+ 879              		.loc 1 385 3 view .LVU209
+ 880              		.loc 1 385 8 is_stmt 0 view .LVU210
+ 881 0068 3D4A     		ldr	r2, .L99
+ 882 006a 1378     		ldrb	r3, [r2]	@ zero_extendqisi2
+ 883 006c 03F0FE03 		and	r3, r3, #254
+ 884 0070 1370     		strb	r3, [r2]
+ 885              	.L82:
+ 386:FATFS/Target/user_diskio_spi.c **** 	}
+ 387:FATFS/Target/user_diskio_spi.c **** 	else
+ 388:FATFS/Target/user_diskio_spi.c **** 	{ /* Failed */
+ARM GAS  C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s 			page 25
+
+
+ 389:FATFS/Target/user_diskio_spi.c **** 		Stat = STA_NOINIT;
+ 390:FATFS/Target/user_diskio_spi.c **** 	}
+ 391:FATFS/Target/user_diskio_spi.c **** 
+ 392:FATFS/Target/user_diskio_spi.c **** 	return Stat;
+ 886              		.loc 1 392 2 is_stmt 1 view .LVU211
+ 887              		.loc 1 392 9 is_stmt 0 view .LVU212
+ 888 0072 3B4B     		ldr	r3, .L99
+ 889 0074 1878     		ldrb	r0, [r3]	@ zero_extendqisi2
+ 890 0076 C0B2     		uxtb	r0, r0
+ 393:FATFS/Target/user_diskio_spi.c **** }
+ 891              		.loc 1 393 1 view .LVU213
+ 892 0078 02B0     		add	sp, sp, #8
+ 893              	.LCFI17:
+ 894              		.cfi_remember_state
+ 895              		.cfi_def_cfa_offset 16
+ 896              		@ sp needed
+ 897 007a 70BD     		pop	{r4, r5, r6, pc}
+ 898              	.LVL85:
+ 899              	.L94:
+ 900              	.LCFI18:
+ 901              		.cfi_restore_state
+ 344:FATFS/Target/user_diskio_spi.c **** 		if (send_cmd(CMD8, 0x1AA) == 1)
+ 902              		.loc 1 344 3 is_stmt 1 view .LVU214
+ 903 007c 4FF47A70 		mov	r0, #1000
+ 904 0080 FFF7FEFF 		bl	SPI_Timer_On
+ 905              	.LVL86:
+ 345:FATFS/Target/user_diskio_spi.c **** 		{ /* SDv2? */
+ 906              		.loc 1 345 3 view .LVU215
+ 345:FATFS/Target/user_diskio_spi.c **** 		{ /* SDv2? */
+ 907              		.loc 1 345 7 is_stmt 0 view .LVU216
+ 908 0084 4FF4D571 		mov	r1, #426
+ 909 0088 0820     		movs	r0, #8
+ 910 008a FFF7FEFF 		bl	send_cmd
+ 911              	.LVL87:
+ 345:FATFS/Target/user_diskio_spi.c **** 		{ /* SDv2? */
+ 912              		.loc 1 345 6 view .LVU217
+ 913 008e 0128     		cmp	r0, #1
+ 914 0090 3CD1     		bne	.L95
+ 347:FATFS/Target/user_diskio_spi.c **** 				ocr[n] = xchg_spi(0xFF); /* Get 32 bit return value of R7 resp */
+ 915              		.loc 1 347 11 view .LVU218
+ 916 0092 2546     		mov	r5, r4
+ 917 0094 08E0     		b	.L71
+ 918              	.LVL88:
+ 919              	.L73:
+ 348:FATFS/Target/user_diskio_spi.c **** 			if (ocr[2] == 0x01 && ocr[3] == 0xAA)
+ 920              		.loc 1 348 5 is_stmt 1 discriminator 3 view .LVU219
+ 348:FATFS/Target/user_diskio_spi.c **** 			if (ocr[2] == 0x01 && ocr[3] == 0xAA)
+ 921              		.loc 1 348 14 is_stmt 0 discriminator 3 view .LVU220
+ 922 0096 FF20     		movs	r0, #255
+ 923 0098 FFF7FEFF 		bl	xchg_spi
+ 924              	.LVL89:
+ 348:FATFS/Target/user_diskio_spi.c **** 			if (ocr[2] == 0x01 && ocr[3] == 0xAA)
+ 925              		.loc 1 348 12 discriminator 3 view .LVU221
+ 926 009c 02AB     		add	r3, sp, #8
+ 927 009e 2B44     		add	r3, r3, r5
+ 928 00a0 03F8040C 		strb	r0, [r3, #-4]
+ 347:FATFS/Target/user_diskio_spi.c **** 				ocr[n] = xchg_spi(0xFF); /* Get 32 bit return value of R7 resp */
+ARM GAS  C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s 			page 26
+
+
+ 929              		.loc 1 347 23 is_stmt 1 discriminator 3 view .LVU222
+ 347:FATFS/Target/user_diskio_spi.c **** 				ocr[n] = xchg_spi(0xFF); /* Get 32 bit return value of R7 resp */
+ 930              		.loc 1 347 24 is_stmt 0 discriminator 3 view .LVU223
+ 931 00a4 0135     		adds	r5, r5, #1
+ 932              	.LVL90:
+ 347:FATFS/Target/user_diskio_spi.c **** 				ocr[n] = xchg_spi(0xFF); /* Get 32 bit return value of R7 resp */
+ 933              		.loc 1 347 24 discriminator 3 view .LVU224
+ 934 00a6 EDB2     		uxtb	r5, r5
+ 935              	.LVL91:
+ 936              	.L71:
+ 347:FATFS/Target/user_diskio_spi.c **** 				ocr[n] = xchg_spi(0xFF); /* Get 32 bit return value of R7 resp */
+ 937              		.loc 1 347 16 is_stmt 1 discriminator 1 view .LVU225
+ 347:FATFS/Target/user_diskio_spi.c **** 				ocr[n] = xchg_spi(0xFF); /* Get 32 bit return value of R7 resp */
+ 938              		.loc 1 347 4 is_stmt 0 discriminator 1 view .LVU226
+ 939 00a8 032D     		cmp	r5, #3
+ 940 00aa F4D9     		bls	.L73
+ 349:FATFS/Target/user_diskio_spi.c **** 			{ /* Is the card supports vcc of 2.7-3.6V? */
+ 941              		.loc 1 349 4 is_stmt 1 view .LVU227
+ 349:FATFS/Target/user_diskio_spi.c **** 			{ /* Is the card supports vcc of 2.7-3.6V? */
+ 942              		.loc 1 349 11 is_stmt 0 view .LVU228
+ 943 00ac 9DF80630 		ldrb	r3, [sp, #6]	@ zero_extendqisi2
+ 349:FATFS/Target/user_diskio_spi.c **** 			{ /* Is the card supports vcc of 2.7-3.6V? */
+ 944              		.loc 1 349 7 view .LVU229
+ 945 00b0 012B     		cmp	r3, #1
+ 946 00b2 CBD1     		bne	.L70
+ 349:FATFS/Target/user_diskio_spi.c **** 			{ /* Is the card supports vcc of 2.7-3.6V? */
+ 947              		.loc 1 349 29 discriminator 1 view .LVU230
+ 948 00b4 9DF80730 		ldrb	r3, [sp, #7]	@ zero_extendqisi2
+ 349:FATFS/Target/user_diskio_spi.c **** 			{ /* Is the card supports vcc of 2.7-3.6V? */
+ 949              		.loc 1 349 23 discriminator 1 view .LVU231
+ 950 00b8 AA2B     		cmp	r3, #170
+ 951 00ba C7D1     		bne	.L70
+ 952              	.L75:
+ 352:FATFS/Target/user_diskio_spi.c **** 				if (SPI_Timer_Status() && send_cmd(CMD58, 0) == 0)
+ 953              		.loc 1 352 6 is_stmt 1 discriminator 2 view .LVU232
+ 351:FATFS/Target/user_diskio_spi.c **** 					; /* Wait for end of initialization with ACMD41(HCS) */
+ 954              		.loc 1 351 11 discriminator 2 view .LVU233
+ 351:FATFS/Target/user_diskio_spi.c **** 					; /* Wait for end of initialization with ACMD41(HCS) */
+ 955              		.loc 1 351 12 is_stmt 0 discriminator 2 view .LVU234
+ 956 00bc FFF7FEFF 		bl	SPI_Timer_Status
+ 957              	.LVL92:
+ 351:FATFS/Target/user_diskio_spi.c **** 					; /* Wait for end of initialization with ACMD41(HCS) */
+ 958              		.loc 1 351 11 discriminator 2 view .LVU235
+ 959 00c0 30B1     		cbz	r0, .L74
+ 351:FATFS/Target/user_diskio_spi.c **** 					; /* Wait for end of initialization with ACMD41(HCS) */
+ 960              		.loc 1 351 34 discriminator 1 view .LVU236
+ 961 00c2 4FF08041 		mov	r1, #1073741824
+ 962 00c6 A920     		movs	r0, #169
+ 963 00c8 FFF7FEFF 		bl	send_cmd
+ 964              	.LVL93:
+ 351:FATFS/Target/user_diskio_spi.c **** 					; /* Wait for end of initialization with ACMD41(HCS) */
+ 965              		.loc 1 351 31 discriminator 1 view .LVU237
+ 966 00cc 0028     		cmp	r0, #0
+ 967 00ce F5D1     		bne	.L75
+ 968              	.L74:
+ 353:FATFS/Target/user_diskio_spi.c **** 				{ /* Check CCS bit in the OCR */
+ 969              		.loc 1 353 5 is_stmt 1 view .LVU238
+ARM GAS  C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s 			page 27
+
+
+ 353:FATFS/Target/user_diskio_spi.c **** 				{ /* Check CCS bit in the OCR */
+ 970              		.loc 1 353 9 is_stmt 0 view .LVU239
+ 971 00d0 FFF7FEFF 		bl	SPI_Timer_Status
+ 972              	.LVL94:
+ 353:FATFS/Target/user_diskio_spi.c **** 				{ /* Check CCS bit in the OCR */
+ 973              		.loc 1 353 8 view .LVU240
+ 974 00d4 08B9     		cbnz	r0, .L96
+ 341:FATFS/Target/user_diskio_spi.c **** 	if (send_cmd(CMD0, 0) == 1)
+ 975              		.loc 1 341 5 view .LVU241
+ 976 00d6 0446     		mov	r4, r0
+ 977 00d8 B8E7     		b	.L70
+ 978              	.L96:
+ 353:FATFS/Target/user_diskio_spi.c **** 				{ /* Check CCS bit in the OCR */
+ 979              		.loc 1 353 31 discriminator 1 view .LVU242
+ 980 00da 0021     		movs	r1, #0
+ 981 00dc 3A20     		movs	r0, #58
+ 982 00de FFF7FEFF 		bl	send_cmd
+ 983              	.LVL95:
+ 353:FATFS/Target/user_diskio_spi.c **** 				{ /* Check CCS bit in the OCR */
+ 984              		.loc 1 353 28 discriminator 1 view .LVU243
+ 985 00e2 0546     		mov	r5, r0
+ 986              	.LVL96:
+ 353:FATFS/Target/user_diskio_spi.c **** 				{ /* Check CCS bit in the OCR */
+ 987              		.loc 1 353 28 discriminator 1 view .LVU244
+ 988 00e4 48B1     		cbz	r0, .L76
+ 989 00e6 B1E7     		b	.L70
+ 990              	.LVL97:
+ 991              	.L77:
+ 356:FATFS/Target/user_diskio_spi.c **** 					ty = (ocr[0] & 0x40) ? CT_SD2 | CT_BLOCK : CT_SD2; /* Card id SDv2 */
+ 992              		.loc 1 356 7 is_stmt 1 discriminator 3 view .LVU245
+ 356:FATFS/Target/user_diskio_spi.c **** 					ty = (ocr[0] & 0x40) ? CT_SD2 | CT_BLOCK : CT_SD2; /* Card id SDv2 */
+ 993              		.loc 1 356 16 is_stmt 0 discriminator 3 view .LVU246
+ 994 00e8 FF20     		movs	r0, #255
+ 995 00ea FFF7FEFF 		bl	xchg_spi
+ 996              	.LVL98:
+ 356:FATFS/Target/user_diskio_spi.c **** 					ty = (ocr[0] & 0x40) ? CT_SD2 | CT_BLOCK : CT_SD2; /* Card id SDv2 */
+ 997              		.loc 1 356 14 discriminator 3 view .LVU247
+ 998 00ee 02AB     		add	r3, sp, #8
+ 999 00f0 2B44     		add	r3, r3, r5
+ 1000 00f2 03F8040C 		strb	r0, [r3, #-4]
+ 355:FATFS/Target/user_diskio_spi.c **** 						ocr[n] = xchg_spi(0xFF);
+ 1001              		.loc 1 355 25 is_stmt 1 discriminator 3 view .LVU248
+ 355:FATFS/Target/user_diskio_spi.c **** 						ocr[n] = xchg_spi(0xFF);
+ 1002              		.loc 1 355 26 is_stmt 0 discriminator 3 view .LVU249
+ 1003 00f6 0135     		adds	r5, r5, #1
+ 1004              	.LVL99:
+ 355:FATFS/Target/user_diskio_spi.c **** 						ocr[n] = xchg_spi(0xFF);
+ 1005              		.loc 1 355 26 discriminator 3 view .LVU250
+ 1006 00f8 EDB2     		uxtb	r5, r5
+ 1007              	.LVL100:
+ 1008              	.L76:
+ 355:FATFS/Target/user_diskio_spi.c **** 						ocr[n] = xchg_spi(0xFF);
+ 1009              		.loc 1 355 18 is_stmt 1 discriminator 1 view .LVU251
+ 355:FATFS/Target/user_diskio_spi.c **** 						ocr[n] = xchg_spi(0xFF);
+ 1010              		.loc 1 355 6 is_stmt 0 discriminator 1 view .LVU252
+ 1011 00fa 032D     		cmp	r5, #3
+ 1012 00fc F4D9     		bls	.L77
+ARM GAS  C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s 			page 28
+
+
+ 357:FATFS/Target/user_diskio_spi.c **** 				}
+ 1013              		.loc 1 357 6 is_stmt 1 view .LVU253
+ 357:FATFS/Target/user_diskio_spi.c **** 				}
+ 1014              		.loc 1 357 15 is_stmt 0 view .LVU254
+ 1015 00fe 9DF80430 		ldrb	r3, [sp, #4]	@ zero_extendqisi2
+ 357:FATFS/Target/user_diskio_spi.c **** 				}
+ 1016              		.loc 1 357 9 view .LVU255
+ 1017 0102 13F0400F 		tst	r3, #64
+ 1018 0106 22D0     		beq	.L86
+ 1019 0108 0C24     		movs	r4, #12
+ 1020 010a 9FE7     		b	.L70
+ 1021              	.LVL101:
+ 1022              	.L95:
+ 363:FATFS/Target/user_diskio_spi.c **** 			{ /* SDv1 or MMC? */
+ 1023              		.loc 1 363 4 is_stmt 1 view .LVU256
+ 363:FATFS/Target/user_diskio_spi.c **** 			{ /* SDv1 or MMC? */
+ 1024              		.loc 1 363 8 is_stmt 0 view .LVU257
+ 1025 010c 0021     		movs	r1, #0
+ 1026 010e A920     		movs	r0, #169
+ 1027 0110 FFF7FEFF 		bl	send_cmd
+ 1028              	.LVL102:
+ 363:FATFS/Target/user_diskio_spi.c **** 			{ /* SDv1 or MMC? */
+ 1029              		.loc 1 363 7 view .LVU258
+ 1030 0114 0128     		cmp	r0, #1
+ 1031 0116 0ED9     		bls	.L97
+ 370:FATFS/Target/user_diskio_spi.c **** 				cmd = CMD1; /* MMCv3 (CMD1(0)) */
+ 1032              		.loc 1 370 8 view .LVU259
+ 1033 0118 2E46     		mov	r6, r5
+ 1034              	.LVL103:
+ 1035              	.L80:
+ 374:FATFS/Target/user_diskio_spi.c **** 			if (!SPI_Timer_Status() || send_cmd(CMD16, 512) != 0) /* Set block length: 512 */
+ 1036              		.loc 1 374 5 is_stmt 1 discriminator 2 view .LVU260
+ 373:FATFS/Target/user_diskio_spi.c **** 				;												  /* Wait for end of initialization */
+ 1037              		.loc 1 373 10 discriminator 2 view .LVU261
+ 373:FATFS/Target/user_diskio_spi.c **** 				;												  /* Wait for end of initialization */
+ 1038              		.loc 1 373 11 is_stmt 0 discriminator 2 view .LVU262
+ 1039 011a FFF7FEFF 		bl	SPI_Timer_Status
+ 1040              	.LVL104:
+ 373:FATFS/Target/user_diskio_spi.c **** 				;												  /* Wait for end of initialization */
+ 1041              		.loc 1 373 10 discriminator 2 view .LVU263
+ 1042 011e 28B1     		cbz	r0, .L79
+ 373:FATFS/Target/user_diskio_spi.c **** 				;												  /* Wait for end of initialization */
+ 1043              		.loc 1 373 33 discriminator 1 view .LVU264
+ 1044 0120 0021     		movs	r1, #0
+ 1045 0122 2846     		mov	r0, r5
+ 1046 0124 FFF7FEFF 		bl	send_cmd
+ 1047              	.LVL105:
+ 373:FATFS/Target/user_diskio_spi.c **** 				;												  /* Wait for end of initialization */
+ 1048              		.loc 1 373 30 discriminator 1 view .LVU265
+ 1049 0128 0028     		cmp	r0, #0
+ 1050 012a F6D1     		bne	.L80
+ 1051              	.L79:
+ 375:FATFS/Target/user_diskio_spi.c **** 				ty = 0;
+ 1052              		.loc 1 375 4 is_stmt 1 view .LVU266
+ 375:FATFS/Target/user_diskio_spi.c **** 				ty = 0;
+ 1053              		.loc 1 375 9 is_stmt 0 view .LVU267
+ 1054 012c FFF7FEFF 		bl	SPI_Timer_Status
+ARM GAS  C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s 			page 29
+
+
+ 1055              	.LVL106:
+ 375:FATFS/Target/user_diskio_spi.c **** 				ty = 0;
+ 1056              		.loc 1 375 7 view .LVU268
+ 1057 0130 20B9     		cbnz	r0, .L98
+ 376:FATFS/Target/user_diskio_spi.c **** 		}
+ 1058              		.loc 1 376 8 view .LVU269
+ 1059 0132 0446     		mov	r4, r0
+ 1060              	.LVL107:
+ 376:FATFS/Target/user_diskio_spi.c **** 		}
+ 1061              		.loc 1 376 8 view .LVU270
+ 1062 0134 8AE7     		b	.L70
+ 1063              	.LVL108:
+ 1064              	.L97:
+ 365:FATFS/Target/user_diskio_spi.c **** 				cmd = ACMD41; /* SDv1 (ACMD41(0)) */
+ 1065              		.loc 1 365 8 view .LVU271
+ 1066 0136 0226     		movs	r6, #2
+ 366:FATFS/Target/user_diskio_spi.c **** 			}
+ 1067              		.loc 1 366 9 view .LVU272
+ 1068 0138 A925     		movs	r5, #169
+ 1069 013a EEE7     		b	.L80
+ 1070              	.LVL109:
+ 1071              	.L98:
+ 375:FATFS/Target/user_diskio_spi.c **** 				ty = 0;
+ 1072              		.loc 1 375 31 discriminator 1 view .LVU273
+ 1073 013c 4FF40071 		mov	r1, #512
+ 1074 0140 1020     		movs	r0, #16
+ 1075 0142 FFF7FEFF 		bl	send_cmd
+ 1076              	.LVL110:
+ 375:FATFS/Target/user_diskio_spi.c **** 				ty = 0;
+ 1077              		.loc 1 375 28 discriminator 1 view .LVU274
+ 1078 0146 0028     		cmp	r0, #0
+ 1079 0148 80D1     		bne	.L70
+ 375:FATFS/Target/user_diskio_spi.c **** 				ty = 0;
+ 1080              		.loc 1 375 28 view .LVU275
+ 1081 014a 3446     		mov	r4, r6
+ 1082              	.LVL111:
+ 375:FATFS/Target/user_diskio_spi.c **** 				ty = 0;
+ 1083              		.loc 1 375 28 view .LVU276
+ 1084 014c 7EE7     		b	.L70
+ 1085              	.LVL112:
+ 1086              	.L86:
+ 357:FATFS/Target/user_diskio_spi.c **** 				}
+ 1087              		.loc 1 357 9 view .LVU277
+ 1088 014e 0424     		movs	r4, #4
+ 1089 0150 7CE7     		b	.L70
+ 1090              	.LVL113:
+ 1091              	.L81:
+ 389:FATFS/Target/user_diskio_spi.c **** 	}
+ 1092              		.loc 1 389 3 is_stmt 1 view .LVU278
+ 389:FATFS/Target/user_diskio_spi.c **** 	}
+ 1093              		.loc 1 389 8 is_stmt 0 view .LVU279
+ 1094 0152 034B     		ldr	r3, .L99
+ 1095 0154 0122     		movs	r2, #1
+ 1096 0156 1A70     		strb	r2, [r3]
+ 1097 0158 8BE7     		b	.L82
+ 1098              	.LVL114:
+ 1099              	.L83:
+ARM GAS  C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s 			page 30
+
+
+ 1100              	.LCFI19:
+ 1101              		.cfi_def_cfa_offset 0
+ 1102              		.cfi_restore 4
+ 1103              		.cfi_restore 5
+ 1104              		.cfi_restore 6
+ 1105              		.cfi_restore 14
+ 331:FATFS/Target/user_diskio_spi.c **** 	// assume SPI already init init_spi();	/* Initialize SPI */
+ 1106              		.loc 1 331 10 view .LVU280
+ 1107 015a 0120     		movs	r0, #1
+ 1108              	.LVL115:
+ 1109              		.loc 1 393 1 view .LVU281
+ 1110 015c 7047     		bx	lr
+ 1111              	.L100:
+ 1112 015e 00BF     		.align	2
+ 1113              	.L99:
+ 1114 0160 00000000 		.word	.LANCHOR2
+ 1115 0164 00000000 		.word	hspi2
+ 1116 0168 00000000 		.word	.LANCHOR3
+ 1117              		.cfi_endproc
+ 1118              	.LFE143:
+ 1120              		.section	.text.USER_SPI_status,"ax",%progbits
+ 1121              		.align	1
+ 1122              		.global	USER_SPI_status
+ 1123              		.syntax unified
+ 1124              		.thumb
+ 1125              		.thumb_func
+ 1126              		.fpu fpv4-sp-d16
+ 1128              	USER_SPI_status:
+ 1129              	.LVL116:
+ 1130              	.LFB144:
+ 394:FATFS/Target/user_diskio_spi.c **** 
+ 395:FATFS/Target/user_diskio_spi.c **** /*-----------------------------------------------------------------------*/
+ 396:FATFS/Target/user_diskio_spi.c **** /* Get disk status                                                       */
+ 397:FATFS/Target/user_diskio_spi.c **** /*-----------------------------------------------------------------------*/
+ 398:FATFS/Target/user_diskio_spi.c **** 
+ 399:FATFS/Target/user_diskio_spi.c **** inline DSTATUS USER_SPI_status(
+ 400:FATFS/Target/user_diskio_spi.c **** 	BYTE drv /* Physical drive number (0) */
+ 401:FATFS/Target/user_diskio_spi.c **** )
+ 402:FATFS/Target/user_diskio_spi.c **** {
+ 1131              		.loc 1 402 1 is_stmt 1 view -0
+ 1132              		.cfi_startproc
+ 1133              		@ args = 0, pretend = 0, frame = 0
+ 1134              		@ frame_needed = 0, uses_anonymous_args = 0
+ 1135              		@ link register save eliminated.
+ 403:FATFS/Target/user_diskio_spi.c **** 	if (drv)
+ 1136              		.loc 1 403 2 view .LVU283
+ 1137              		.loc 1 403 5 is_stmt 0 view .LVU284
+ 1138 0000 18B9     		cbnz	r0, .L103
+ 404:FATFS/Target/user_diskio_spi.c **** 		return STA_NOINIT; /* Supports only drive 0 */
+ 405:FATFS/Target/user_diskio_spi.c **** 
+ 406:FATFS/Target/user_diskio_spi.c **** 	return Stat; /* Return disk status */
+ 1139              		.loc 1 406 2 is_stmt 1 view .LVU285
+ 1140              		.loc 1 406 9 is_stmt 0 view .LVU286
+ 1141 0002 034B     		ldr	r3, .L104
+ 1142 0004 1878     		ldrb	r0, [r3]	@ zero_extendqisi2
+ 1143              	.LVL117:
+ 1144              		.loc 1 406 9 view .LVU287
+ARM GAS  C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s 			page 31
+
+
+ 1145 0006 C0B2     		uxtb	r0, r0
+ 1146 0008 7047     		bx	lr
+ 1147              	.LVL118:
+ 1148              	.L103:
+ 404:FATFS/Target/user_diskio_spi.c **** 		return STA_NOINIT; /* Supports only drive 0 */
+ 1149              		.loc 1 404 10 view .LVU288
+ 1150 000a 0120     		movs	r0, #1
+ 1151              	.LVL119:
+ 407:FATFS/Target/user_diskio_spi.c **** }
+ 1152              		.loc 1 407 1 view .LVU289
+ 1153 000c 7047     		bx	lr
+ 1154              	.L105:
+ 1155 000e 00BF     		.align	2
+ 1156              	.L104:
+ 1157 0010 00000000 		.word	.LANCHOR2
+ 1158              		.cfi_endproc
+ 1159              	.LFE144:
+ 1161              		.section	.text.USER_SPI_read,"ax",%progbits
+ 1162              		.align	1
+ 1163              		.global	USER_SPI_read
+ 1164              		.syntax unified
+ 1165              		.thumb
+ 1166              		.thumb_func
+ 1167              		.fpu fpv4-sp-d16
+ 1169              	USER_SPI_read:
+ 1170              	.LVL120:
+ 1171              	.LFB145:
+ 408:FATFS/Target/user_diskio_spi.c **** 
+ 409:FATFS/Target/user_diskio_spi.c **** /*-----------------------------------------------------------------------*/
+ 410:FATFS/Target/user_diskio_spi.c **** /* Read sector(s)                                                        */
+ 411:FATFS/Target/user_diskio_spi.c **** /*-----------------------------------------------------------------------*/
+ 412:FATFS/Target/user_diskio_spi.c **** 
+ 413:FATFS/Target/user_diskio_spi.c **** inline DRESULT USER_SPI_read(
+ 414:FATFS/Target/user_diskio_spi.c **** 	BYTE drv,	  /* Physical drive number (0) */
+ 415:FATFS/Target/user_diskio_spi.c **** 	BYTE *buff,	  /* Pointer to the data buffer to store read data */
+ 416:FATFS/Target/user_diskio_spi.c **** 	DWORD sector, /* Start sector number (LBA) */
+ 417:FATFS/Target/user_diskio_spi.c **** 	UINT count	  /* Number of sectors to read (1..128) */
+ 418:FATFS/Target/user_diskio_spi.c **** )
+ 419:FATFS/Target/user_diskio_spi.c **** {
+ 1172              		.loc 1 419 1 is_stmt 1 view -0
+ 1173              		.cfi_startproc
+ 1174              		@ args = 0, pretend = 0, frame = 0
+ 1175              		@ frame_needed = 0, uses_anonymous_args = 0
+ 420:FATFS/Target/user_diskio_spi.c **** 	if (drv || !count)
+ 1176              		.loc 1 420 2 view .LVU291
+ 1177              		.loc 1 420 5 is_stmt 0 view .LVU292
+ 1178 0000 0028     		cmp	r0, #0
+ 1179 0002 39D1     		bne	.L113
+ 419:FATFS/Target/user_diskio_spi.c **** 	if (drv || !count)
+ 1180              		.loc 1 419 1 discriminator 1 view .LVU293
+ 1181 0004 38B5     		push	{r3, r4, r5, lr}
+ 1182              	.LCFI20:
+ 1183              		.cfi_def_cfa_offset 16
+ 1184              		.cfi_offset 3, -16
+ 1185              		.cfi_offset 4, -12
+ 1186              		.cfi_offset 5, -8
+ 1187              		.cfi_offset 14, -4
+ARM GAS  C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s 			page 32
+
+
+ 1188 0006 0D46     		mov	r5, r1
+ 1189 0008 1C46     		mov	r4, r3
+ 1190              		.loc 1 420 10 discriminator 1 view .LVU294
+ 1191 000a 002B     		cmp	r3, #0
+ 1192 000c 36D0     		beq	.L114
+ 421:FATFS/Target/user_diskio_spi.c **** 		return RES_PARERR; /* Check parameter */
+ 422:FATFS/Target/user_diskio_spi.c **** 	if (Stat & STA_NOINIT)
+ 1193              		.loc 1 422 2 is_stmt 1 view .LVU295
+ 1194              		.loc 1 422 11 is_stmt 0 view .LVU296
+ 1195 000e 1D4B     		ldr	r3, .L122
+ 1196              	.LVL121:
+ 1197              		.loc 1 422 11 view .LVU297
+ 1198 0010 1B78     		ldrb	r3, [r3]	@ zero_extendqisi2
+ 1199              		.loc 1 422 5 view .LVU298
+ 1200 0012 13F0010F 		tst	r3, #1
+ 1201 0016 33D1     		bne	.L115
+ 423:FATFS/Target/user_diskio_spi.c **** 		return RES_NOTRDY; /* Check if drive is ready */
+ 424:FATFS/Target/user_diskio_spi.c **** 
+ 425:FATFS/Target/user_diskio_spi.c **** 	if (!(CardType & CT_BLOCK))
+ 1202              		.loc 1 425 2 is_stmt 1 view .LVU299
+ 1203              		.loc 1 425 17 is_stmt 0 view .LVU300
+ 1204 0018 1B4B     		ldr	r3, .L122+4
+ 1205 001a 1B78     		ldrb	r3, [r3]	@ zero_extendqisi2
+ 1206              		.loc 1 425 5 view .LVU301
+ 1207 001c 13F0080F 		tst	r3, #8
+ 1208 0020 00D1     		bne	.L108
+ 426:FATFS/Target/user_diskio_spi.c **** 		sector *= 512; /* LBA ot BA conversion (byte addressing cards) */
+ 1209              		.loc 1 426 3 is_stmt 1 view .LVU302
+ 1210              		.loc 1 426 10 is_stmt 0 view .LVU303
+ 1211 0022 5202     		lsls	r2, r2, #9
+ 1212              	.LVL122:
+ 1213              	.L108:
+ 427:FATFS/Target/user_diskio_spi.c **** 
+ 428:FATFS/Target/user_diskio_spi.c **** 	if (count == 1)
+ 1214              		.loc 1 428 2 is_stmt 1 view .LVU304
+ 1215              		.loc 1 428 5 is_stmt 0 view .LVU305
+ 1216 0024 012C     		cmp	r4, #1
+ 1217 0026 18D0     		beq	.L121
+ 429:FATFS/Target/user_diskio_spi.c **** 	{									   /* Single sector read */
+ 430:FATFS/Target/user_diskio_spi.c **** 		if ((send_cmd(CMD17, sector) == 0) /* READ_SINGLE_BLOCK */
+ 431:FATFS/Target/user_diskio_spi.c **** 			&& rcvr_datablock(buff, 512))
+ 432:FATFS/Target/user_diskio_spi.c **** 		{
+ 433:FATFS/Target/user_diskio_spi.c **** 			count = 0;
+ 434:FATFS/Target/user_diskio_spi.c **** 		}
+ 435:FATFS/Target/user_diskio_spi.c **** 	}
+ 436:FATFS/Target/user_diskio_spi.c **** 	else
+ 437:FATFS/Target/user_diskio_spi.c **** 	{ /* Multiple sector read */
+ 438:FATFS/Target/user_diskio_spi.c **** 		if (send_cmd(CMD18, sector) == 0)
+ 1218              		.loc 1 438 3 is_stmt 1 view .LVU306
+ 1219              		.loc 1 438 7 is_stmt 0 view .LVU307
+ 1220 0028 1146     		mov	r1, r2
+ 1221              	.LVL123:
+ 1222              		.loc 1 438 7 view .LVU308
+ 1223 002a 1220     		movs	r0, #18
+ 1224              	.LVL124:
+ 1225              		.loc 1 438 7 view .LVU309
+ 1226 002c FFF7FEFF 		bl	send_cmd
+ARM GAS  C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s 			page 33
+
+
+ 1227              	.LVL125:
+ 1228              		.loc 1 438 6 view .LVU310
+ 1229 0030 68B9     		cbnz	r0, .L110
+ 1230              	.L112:
+ 439:FATFS/Target/user_diskio_spi.c **** 		{ /* READ_MULTIPLE_BLOCK */
+ 440:FATFS/Target/user_diskio_spi.c **** 			do
+ 1231              		.loc 1 440 4 is_stmt 1 view .LVU311
+ 441:FATFS/Target/user_diskio_spi.c **** 			{
+ 442:FATFS/Target/user_diskio_spi.c **** 				if (!rcvr_datablock(buff, 512))
+ 1232              		.loc 1 442 5 view .LVU312
+ 1233              		.loc 1 442 10 is_stmt 0 view .LVU313
+ 1234 0032 4FF40071 		mov	r1, #512
+ 1235 0036 2846     		mov	r0, r5
+ 1236 0038 FFF7FEFF 		bl	rcvr_datablock
+ 1237              	.LVL126:
+ 1238              		.loc 1 442 8 view .LVU314
+ 1239 003c 18B1     		cbz	r0, .L111
+ 443:FATFS/Target/user_diskio_spi.c **** 					break;
+ 444:FATFS/Target/user_diskio_spi.c **** 				buff += 512;
+ 1240              		.loc 1 444 5 is_stmt 1 view .LVU315
+ 1241              		.loc 1 444 10 is_stmt 0 view .LVU316
+ 1242 003e 05F50075 		add	r5, r5, #512
+ 1243              	.LVL127:
+ 445:FATFS/Target/user_diskio_spi.c **** 			} while (--count);
+ 1244              		.loc 1 445 12 is_stmt 1 view .LVU317
+ 1245              		.loc 1 445 4 is_stmt 0 view .LVU318
+ 1246 0042 013C     		subs	r4, r4, #1
+ 1247              	.LVL128:
+ 1248              		.loc 1 445 4 view .LVU319
+ 1249 0044 F5D1     		bne	.L112
+ 1250              	.L111:
+ 446:FATFS/Target/user_diskio_spi.c **** 			send_cmd(CMD12, 0); /* STOP_TRANSMISSION */
+ 1251              		.loc 1 446 4 is_stmt 1 view .LVU320
+ 1252 0046 0021     		movs	r1, #0
+ 1253 0048 0C20     		movs	r0, #12
+ 1254 004a FFF7FEFF 		bl	send_cmd
+ 1255              	.LVL129:
+ 1256              	.L110:
+ 447:FATFS/Target/user_diskio_spi.c **** 		}
+ 448:FATFS/Target/user_diskio_spi.c **** 	}
+ 449:FATFS/Target/user_diskio_spi.c **** 	despiselect();
+ 1257              		.loc 1 449 2 view .LVU321
+ 1258 004e FFF7FEFF 		bl	despiselect
+ 1259              	.LVL130:
+ 450:FATFS/Target/user_diskio_spi.c **** 
+ 451:FATFS/Target/user_diskio_spi.c **** 	return count ? RES_ERROR : RES_OK; /* Return result */
+ 1260              		.loc 1 451 2 view .LVU322
+ 1261              		.loc 1 451 27 is_stmt 0 view .LVU323
+ 1262 0052 201E     		subs	r0, r4, #0
+ 1263 0054 18BF     		it	ne
+ 1264 0056 0120     		movne	r0, #1
+ 1265              	.L107:
+ 452:FATFS/Target/user_diskio_spi.c **** }
+ 1266              		.loc 1 452 1 view .LVU324
+ 1267 0058 38BD     		pop	{r3, r4, r5, pc}
+ 1268              	.LVL131:
+ 1269              	.L121:
+ARM GAS  C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s 			page 34
+
+
+ 430:FATFS/Target/user_diskio_spi.c **** 			&& rcvr_datablock(buff, 512))
+ 1270              		.loc 1 430 3 is_stmt 1 view .LVU325
+ 430:FATFS/Target/user_diskio_spi.c **** 			&& rcvr_datablock(buff, 512))
+ 1271              		.loc 1 430 8 is_stmt 0 view .LVU326
+ 1272 005a 1146     		mov	r1, r2
+ 1273              	.LVL132:
+ 430:FATFS/Target/user_diskio_spi.c **** 			&& rcvr_datablock(buff, 512))
+ 1274              		.loc 1 430 8 view .LVU327
+ 1275 005c 1120     		movs	r0, #17
+ 1276              	.LVL133:
+ 430:FATFS/Target/user_diskio_spi.c **** 			&& rcvr_datablock(buff, 512))
+ 1277              		.loc 1 430 8 view .LVU328
+ 1278 005e FFF7FEFF 		bl	send_cmd
+ 1279              	.LVL134:
+ 430:FATFS/Target/user_diskio_spi.c **** 			&& rcvr_datablock(buff, 512))
+ 1280              		.loc 1 430 6 view .LVU329
+ 1281 0062 0028     		cmp	r0, #0
+ 1282 0064 F3D1     		bne	.L110
+ 431:FATFS/Target/user_diskio_spi.c **** 		{
+ 1283              		.loc 1 431 7 view .LVU330
+ 1284 0066 4FF40071 		mov	r1, #512
+ 1285 006a 2846     		mov	r0, r5
+ 1286 006c FFF7FEFF 		bl	rcvr_datablock
+ 1287              	.LVL135:
+ 431:FATFS/Target/user_diskio_spi.c **** 		{
+ 1288              		.loc 1 431 4 view .LVU331
+ 1289 0070 0028     		cmp	r0, #0
+ 1290 0072 ECD0     		beq	.L110
+ 433:FATFS/Target/user_diskio_spi.c **** 		}
+ 1291              		.loc 1 433 10 view .LVU332
+ 1292 0074 0024     		movs	r4, #0
+ 1293              	.LVL136:
+ 433:FATFS/Target/user_diskio_spi.c **** 		}
+ 1294              		.loc 1 433 10 view .LVU333
+ 1295 0076 EAE7     		b	.L110
+ 1296              	.LVL137:
+ 1297              	.L113:
+ 1298              	.LCFI21:
+ 1299              		.cfi_def_cfa_offset 0
+ 1300              		.cfi_restore 3
+ 1301              		.cfi_restore 4
+ 1302              		.cfi_restore 5
+ 1303              		.cfi_restore 14
+ 421:FATFS/Target/user_diskio_spi.c **** 	if (Stat & STA_NOINIT)
+ 1304              		.loc 1 421 10 view .LVU334
+ 1305 0078 0420     		movs	r0, #4
+ 1306              	.LVL138:
+ 1307              		.loc 1 452 1 view .LVU335
+ 1308 007a 7047     		bx	lr
+ 1309              	.LVL139:
+ 1310              	.L114:
+ 1311              	.LCFI22:
+ 1312              		.cfi_def_cfa_offset 16
+ 1313              		.cfi_offset 3, -16
+ 1314              		.cfi_offset 4, -12
+ 1315              		.cfi_offset 5, -8
+ 1316              		.cfi_offset 14, -4
+ARM GAS  C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s 			page 35
+
+
+ 421:FATFS/Target/user_diskio_spi.c **** 	if (Stat & STA_NOINIT)
+ 1317              		.loc 1 421 10 view .LVU336
+ 1318 007c 0420     		movs	r0, #4
+ 1319              	.LVL140:
+ 421:FATFS/Target/user_diskio_spi.c **** 	if (Stat & STA_NOINIT)
+ 1320              		.loc 1 421 10 view .LVU337
+ 1321 007e EBE7     		b	.L107
+ 1322              	.LVL141:
+ 1323              	.L115:
+ 423:FATFS/Target/user_diskio_spi.c **** 
+ 1324              		.loc 1 423 10 view .LVU338
+ 1325 0080 0320     		movs	r0, #3
+ 1326              	.LVL142:
+ 423:FATFS/Target/user_diskio_spi.c **** 
+ 1327              		.loc 1 423 10 view .LVU339
+ 1328 0082 E9E7     		b	.L107
+ 1329              	.L123:
+ 1330              		.align	2
+ 1331              	.L122:
+ 1332 0084 00000000 		.word	.LANCHOR2
+ 1333 0088 00000000 		.word	.LANCHOR3
+ 1334              		.cfi_endproc
+ 1335              	.LFE145:
+ 1337              		.section	.text.USER_SPI_write,"ax",%progbits
+ 1338              		.align	1
+ 1339              		.global	USER_SPI_write
+ 1340              		.syntax unified
+ 1341              		.thumb
+ 1342              		.thumb_func
+ 1343              		.fpu fpv4-sp-d16
+ 1345              	USER_SPI_write:
+ 1346              	.LVL143:
+ 1347              	.LFB146:
+ 453:FATFS/Target/user_diskio_spi.c **** 
+ 454:FATFS/Target/user_diskio_spi.c **** /*-----------------------------------------------------------------------*/
+ 455:FATFS/Target/user_diskio_spi.c **** /* Write sector(s)                                                       */
+ 456:FATFS/Target/user_diskio_spi.c **** /*-----------------------------------------------------------------------*/
+ 457:FATFS/Target/user_diskio_spi.c **** 
+ 458:FATFS/Target/user_diskio_spi.c **** #if _USE_WRITE
+ 459:FATFS/Target/user_diskio_spi.c **** inline DRESULT USER_SPI_write(
+ 460:FATFS/Target/user_diskio_spi.c **** 	BYTE drv,		  /* Physical drive number (0) */
+ 461:FATFS/Target/user_diskio_spi.c **** 	const BYTE *buff, /* Ponter to the data to write */
+ 462:FATFS/Target/user_diskio_spi.c **** 	DWORD sector,	  /* Start sector number (LBA) */
+ 463:FATFS/Target/user_diskio_spi.c **** 	UINT count		  /* Number of sectors to write (1..128) */
+ 464:FATFS/Target/user_diskio_spi.c **** )
+ 465:FATFS/Target/user_diskio_spi.c **** {
+ 1348              		.loc 1 465 1 is_stmt 1 view -0
+ 1349              		.cfi_startproc
+ 1350              		@ args = 0, pretend = 0, frame = 0
+ 1351              		@ frame_needed = 0, uses_anonymous_args = 0
+ 466:FATFS/Target/user_diskio_spi.c **** 	if (drv || !count)
+ 1352              		.loc 1 466 2 view .LVU341
+ 1353              		.loc 1 466 5 is_stmt 0 view .LVU342
+ 1354 0000 0028     		cmp	r0, #0
+ 1355 0002 48D1     		bne	.L132
+ 465:FATFS/Target/user_diskio_spi.c **** 	if (drv || !count)
+ 1356              		.loc 1 465 1 discriminator 1 view .LVU343
+ARM GAS  C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s 			page 36
+
+
+ 1357 0004 70B5     		push	{r4, r5, r6, lr}
+ 1358              	.LCFI23:
+ 1359              		.cfi_def_cfa_offset 16
+ 1360              		.cfi_offset 4, -16
+ 1361              		.cfi_offset 5, -12
+ 1362              		.cfi_offset 6, -8
+ 1363              		.cfi_offset 14, -4
+ 1364 0006 0D46     		mov	r5, r1
+ 1365 0008 1646     		mov	r6, r2
+ 1366 000a 1C46     		mov	r4, r3
+ 1367              		.loc 1 466 10 discriminator 1 view .LVU344
+ 1368 000c 002B     		cmp	r3, #0
+ 1369 000e 44D0     		beq	.L133
+ 467:FATFS/Target/user_diskio_spi.c **** 		return RES_PARERR; /* Check parameter */
+ 468:FATFS/Target/user_diskio_spi.c **** 	if (Stat & STA_NOINIT)
+ 1370              		.loc 1 468 2 is_stmt 1 view .LVU345
+ 1371              		.loc 1 468 11 is_stmt 0 view .LVU346
+ 1372 0010 254B     		ldr	r3, .L144
+ 1373              	.LVL144:
+ 1374              		.loc 1 468 11 view .LVU347
+ 1375 0012 1B78     		ldrb	r3, [r3]	@ zero_extendqisi2
+ 1376              		.loc 1 468 5 view .LVU348
+ 1377 0014 13F0010F 		tst	r3, #1
+ 1378 0018 41D1     		bne	.L134
+ 469:FATFS/Target/user_diskio_spi.c **** 		return RES_NOTRDY; /* Check drive status */
+ 470:FATFS/Target/user_diskio_spi.c **** 	if (Stat & STA_PROTECT)
+ 1379              		.loc 1 470 2 is_stmt 1 view .LVU349
+ 1380              		.loc 1 470 11 is_stmt 0 view .LVU350
+ 1381 001a 234B     		ldr	r3, .L144
+ 1382 001c 1B78     		ldrb	r3, [r3]	@ zero_extendqisi2
+ 1383              		.loc 1 470 5 view .LVU351
+ 1384 001e 13F0040F 		tst	r3, #4
+ 1385 0022 3ED1     		bne	.L135
+ 471:FATFS/Target/user_diskio_spi.c **** 		return RES_WRPRT; /* Check write protect */
+ 472:FATFS/Target/user_diskio_spi.c **** 
+ 473:FATFS/Target/user_diskio_spi.c **** 	if (!(CardType & CT_BLOCK))
+ 1386              		.loc 1 473 2 is_stmt 1 view .LVU352
+ 1387              		.loc 1 473 17 is_stmt 0 view .LVU353
+ 1388 0024 214B     		ldr	r3, .L144+4
+ 1389 0026 1B78     		ldrb	r3, [r3]	@ zero_extendqisi2
+ 1390              		.loc 1 473 5 view .LVU354
+ 1391 0028 13F0080F 		tst	r3, #8
+ 1392 002c 00D1     		bne	.L126
+ 474:FATFS/Target/user_diskio_spi.c **** 		sector *= 512; /* LBA ==> BA conversion (byte addressing cards) */
+ 1393              		.loc 1 474 3 is_stmt 1 view .LVU355
+ 1394              		.loc 1 474 10 is_stmt 0 view .LVU356
+ 1395 002e 5602     		lsls	r6, r2, #9
+ 1396              	.LVL145:
+ 1397              	.L126:
+ 475:FATFS/Target/user_diskio_spi.c **** 
+ 476:FATFS/Target/user_diskio_spi.c **** 	if (count == 1)
+ 1398              		.loc 1 476 2 is_stmt 1 view .LVU357
+ 1399              		.loc 1 476 5 is_stmt 0 view .LVU358
+ 1400 0030 012C     		cmp	r4, #1
+ 1401 0032 1BD0     		beq	.L142
+ 477:FATFS/Target/user_diskio_spi.c **** 	{									   /* Single sector write */
+ 478:FATFS/Target/user_diskio_spi.c **** 		if ((send_cmd(CMD24, sector) == 0) /* WRITE_BLOCK */
+ARM GAS  C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s 			page 37
+
+
+ 479:FATFS/Target/user_diskio_spi.c **** 			&& xmit_datablock(buff, 0xFE))
+ 480:FATFS/Target/user_diskio_spi.c **** 		{
+ 481:FATFS/Target/user_diskio_spi.c **** 			count = 0;
+ 482:FATFS/Target/user_diskio_spi.c **** 		}
+ 483:FATFS/Target/user_diskio_spi.c **** 	}
+ 484:FATFS/Target/user_diskio_spi.c **** 	else
+ 485:FATFS/Target/user_diskio_spi.c **** 	{ /* Multiple sector write */
+ 486:FATFS/Target/user_diskio_spi.c **** 		if (CardType & CT_SDC)
+ 1402              		.loc 1 486 3 is_stmt 1 view .LVU359
+ 1403              		.loc 1 486 6 is_stmt 0 view .LVU360
+ 1404 0034 13F0060F 		tst	r3, #6
+ 1405 0038 26D1     		bne	.L143
+ 1406              	.LVL146:
+ 1407              	.L129:
+ 487:FATFS/Target/user_diskio_spi.c **** 			send_cmd(ACMD23, count); /* Predefine number of sectors */
+ 488:FATFS/Target/user_diskio_spi.c **** 		if (send_cmd(CMD25, sector) == 0)
+ 1408              		.loc 1 488 3 is_stmt 1 view .LVU361
+ 1409              		.loc 1 488 7 is_stmt 0 view .LVU362
+ 1410 003a 3146     		mov	r1, r6
+ 1411 003c 1920     		movs	r0, #25
+ 1412 003e FFF7FEFF 		bl	send_cmd
+ 1413              	.LVL147:
+ 1414              		.loc 1 488 6 view .LVU363
+ 1415 0042 68B9     		cbnz	r0, .L128
+ 1416              	.L131:
+ 489:FATFS/Target/user_diskio_spi.c **** 		{ /* WRITE_MULTIPLE_BLOCK */
+ 490:FATFS/Target/user_diskio_spi.c **** 			do
+ 1417              		.loc 1 490 4 is_stmt 1 view .LVU364
+ 491:FATFS/Target/user_diskio_spi.c **** 			{
+ 492:FATFS/Target/user_diskio_spi.c **** 				if (!xmit_datablock(buff, 0xFC))
+ 1418              		.loc 1 492 5 view .LVU365
+ 1419              		.loc 1 492 10 is_stmt 0 view .LVU366
+ 1420 0044 FC21     		movs	r1, #252
+ 1421 0046 2846     		mov	r0, r5
+ 1422 0048 FFF7FEFF 		bl	xmit_datablock
+ 1423              	.LVL148:
+ 1424              		.loc 1 492 8 view .LVU367
+ 1425 004c 18B1     		cbz	r0, .L130
+ 493:FATFS/Target/user_diskio_spi.c **** 					break;
+ 494:FATFS/Target/user_diskio_spi.c **** 				buff += 512;
+ 1426              		.loc 1 494 5 is_stmt 1 view .LVU368
+ 1427              		.loc 1 494 10 is_stmt 0 view .LVU369
+ 1428 004e 05F50075 		add	r5, r5, #512
+ 1429              	.LVL149:
+ 495:FATFS/Target/user_diskio_spi.c **** 			} while (--count);
+ 1430              		.loc 1 495 12 is_stmt 1 view .LVU370
+ 1431              		.loc 1 495 4 is_stmt 0 view .LVU371
+ 1432 0052 013C     		subs	r4, r4, #1
+ 1433              	.LVL150:
+ 1434              		.loc 1 495 4 view .LVU372
+ 1435 0054 F6D1     		bne	.L131
+ 1436              	.L130:
+ 496:FATFS/Target/user_diskio_spi.c **** 			if (!xmit_datablock(0, 0xFD))
+ 1437              		.loc 1 496 4 is_stmt 1 view .LVU373
+ 1438              		.loc 1 496 9 is_stmt 0 view .LVU374
+ 1439 0056 FD21     		movs	r1, #253
+ 1440 0058 0020     		movs	r0, #0
+ARM GAS  C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s 			page 38
+
+
+ 1441 005a FFF7FEFF 		bl	xmit_datablock
+ 1442              	.LVL151:
+ 1443              		.loc 1 496 7 view .LVU375
+ 1444 005e C0B1     		cbz	r0, .L137
+ 1445              	.LVL152:
+ 1446              	.L128:
+ 497:FATFS/Target/user_diskio_spi.c **** 				count = 1; /* STOP_TRAN token */
+ 498:FATFS/Target/user_diskio_spi.c **** 		}
+ 499:FATFS/Target/user_diskio_spi.c **** 	}
+ 500:FATFS/Target/user_diskio_spi.c **** 	despiselect();
+ 1447              		.loc 1 500 2 is_stmt 1 view .LVU376
+ 1448 0060 FFF7FEFF 		bl	despiselect
+ 1449              	.LVL153:
+ 501:FATFS/Target/user_diskio_spi.c **** 
+ 502:FATFS/Target/user_diskio_spi.c **** 	return count ? RES_ERROR : RES_OK; /* Return result */
+ 1450              		.loc 1 502 2 view .LVU377
+ 1451              		.loc 1 502 27 is_stmt 0 view .LVU378
+ 1452 0064 201E     		subs	r0, r4, #0
+ 1453 0066 18BF     		it	ne
+ 1454 0068 0120     		movne	r0, #1
+ 1455              	.L125:
+ 503:FATFS/Target/user_diskio_spi.c **** }
+ 1456              		.loc 1 503 1 view .LVU379
+ 1457 006a 70BD     		pop	{r4, r5, r6, pc}
+ 1458              	.LVL154:
+ 1459              	.L142:
+ 478:FATFS/Target/user_diskio_spi.c **** 			&& xmit_datablock(buff, 0xFE))
+ 1460              		.loc 1 478 3 is_stmt 1 view .LVU380
+ 478:FATFS/Target/user_diskio_spi.c **** 			&& xmit_datablock(buff, 0xFE))
+ 1461              		.loc 1 478 8 is_stmt 0 view .LVU381
+ 1462 006c 3146     		mov	r1, r6
+ 1463              	.LVL155:
+ 478:FATFS/Target/user_diskio_spi.c **** 			&& xmit_datablock(buff, 0xFE))
+ 1464              		.loc 1 478 8 view .LVU382
+ 1465 006e 1820     		movs	r0, #24
+ 1466              	.LVL156:
+ 478:FATFS/Target/user_diskio_spi.c **** 			&& xmit_datablock(buff, 0xFE))
+ 1467              		.loc 1 478 8 view .LVU383
+ 1468 0070 FFF7FEFF 		bl	send_cmd
+ 1469              	.LVL157:
+ 478:FATFS/Target/user_diskio_spi.c **** 			&& xmit_datablock(buff, 0xFE))
+ 1470              		.loc 1 478 6 view .LVU384
+ 1471 0074 0028     		cmp	r0, #0
+ 1472 0076 F3D1     		bne	.L128
+ 479:FATFS/Target/user_diskio_spi.c **** 		{
+ 1473              		.loc 1 479 7 view .LVU385
+ 1474 0078 FE21     		movs	r1, #254
+ 1475 007a 2846     		mov	r0, r5
+ 1476 007c FFF7FEFF 		bl	xmit_datablock
+ 1477              	.LVL158:
+ 479:FATFS/Target/user_diskio_spi.c **** 		{
+ 1478              		.loc 1 479 4 view .LVU386
+ 1479 0080 0028     		cmp	r0, #0
+ 1480 0082 EDD0     		beq	.L128
+ 481:FATFS/Target/user_diskio_spi.c **** 		}
+ 1481              		.loc 1 481 10 view .LVU387
+ 1482 0084 0024     		movs	r4, #0
+ARM GAS  C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s 			page 39
+
+
+ 1483              	.LVL159:
+ 481:FATFS/Target/user_diskio_spi.c **** 		}
+ 1484              		.loc 1 481 10 view .LVU388
+ 1485 0086 EBE7     		b	.L128
+ 1486              	.LVL160:
+ 1487              	.L143:
+ 487:FATFS/Target/user_diskio_spi.c **** 		if (send_cmd(CMD25, sector) == 0)
+ 1488              		.loc 1 487 4 is_stmt 1 view .LVU389
+ 1489 0088 2146     		mov	r1, r4
+ 1490              	.LVL161:
+ 487:FATFS/Target/user_diskio_spi.c **** 		if (send_cmd(CMD25, sector) == 0)
+ 1491              		.loc 1 487 4 is_stmt 0 view .LVU390
+ 1492 008a 9720     		movs	r0, #151
+ 1493              	.LVL162:
+ 487:FATFS/Target/user_diskio_spi.c **** 		if (send_cmd(CMD25, sector) == 0)
+ 1494              		.loc 1 487 4 view .LVU391
+ 1495 008c FFF7FEFF 		bl	send_cmd
+ 1496              	.LVL163:
+ 1497 0090 D3E7     		b	.L129
+ 1498              	.L137:
+ 497:FATFS/Target/user_diskio_spi.c **** 		}
+ 1499              		.loc 1 497 11 view .LVU392
+ 1500 0092 0124     		movs	r4, #1
+ 1501              	.LVL164:
+ 497:FATFS/Target/user_diskio_spi.c **** 		}
+ 1502              		.loc 1 497 11 view .LVU393
+ 1503 0094 E4E7     		b	.L128
+ 1504              	.LVL165:
+ 1505              	.L132:
+ 1506              	.LCFI24:
+ 1507              		.cfi_def_cfa_offset 0
+ 1508              		.cfi_restore 4
+ 1509              		.cfi_restore 5
+ 1510              		.cfi_restore 6
+ 1511              		.cfi_restore 14
+ 467:FATFS/Target/user_diskio_spi.c **** 	if (Stat & STA_NOINIT)
+ 1512              		.loc 1 467 10 view .LVU394
+ 1513 0096 0420     		movs	r0, #4
+ 1514              	.LVL166:
+ 1515              		.loc 1 503 1 view .LVU395
+ 1516 0098 7047     		bx	lr
+ 1517              	.LVL167:
+ 1518              	.L133:
+ 1519              	.LCFI25:
+ 1520              		.cfi_def_cfa_offset 16
+ 1521              		.cfi_offset 4, -16
+ 1522              		.cfi_offset 5, -12
+ 1523              		.cfi_offset 6, -8
+ 1524              		.cfi_offset 14, -4
+ 467:FATFS/Target/user_diskio_spi.c **** 	if (Stat & STA_NOINIT)
+ 1525              		.loc 1 467 10 view .LVU396
+ 1526 009a 0420     		movs	r0, #4
+ 1527              	.LVL168:
+ 467:FATFS/Target/user_diskio_spi.c **** 	if (Stat & STA_NOINIT)
+ 1528              		.loc 1 467 10 view .LVU397
+ 1529 009c E5E7     		b	.L125
+ 1530              	.LVL169:
+ARM GAS  C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s 			page 40
+
+
+ 1531              	.L134:
+ 469:FATFS/Target/user_diskio_spi.c **** 	if (Stat & STA_PROTECT)
+ 1532              		.loc 1 469 10 view .LVU398
+ 1533 009e 0320     		movs	r0, #3
+ 1534              	.LVL170:
+ 469:FATFS/Target/user_diskio_spi.c **** 	if (Stat & STA_PROTECT)
+ 1535              		.loc 1 469 10 view .LVU399
+ 1536 00a0 E3E7     		b	.L125
+ 1537              	.LVL171:
+ 1538              	.L135:
+ 471:FATFS/Target/user_diskio_spi.c **** 
+ 1539              		.loc 1 471 10 view .LVU400
+ 1540 00a2 0220     		movs	r0, #2
+ 1541              	.LVL172:
+ 471:FATFS/Target/user_diskio_spi.c **** 
+ 1542              		.loc 1 471 10 view .LVU401
+ 1543 00a4 E1E7     		b	.L125
+ 1544              	.L145:
+ 1545 00a6 00BF     		.align	2
+ 1546              	.L144:
+ 1547 00a8 00000000 		.word	.LANCHOR2
+ 1548 00ac 00000000 		.word	.LANCHOR3
+ 1549              		.cfi_endproc
+ 1550              	.LFE146:
+ 1552              		.section	.text.USER_SPI_ioctl,"ax",%progbits
+ 1553              		.align	1
+ 1554              		.global	USER_SPI_ioctl
+ 1555              		.syntax unified
+ 1556              		.thumb
+ 1557              		.thumb_func
+ 1558              		.fpu fpv4-sp-d16
+ 1560              	USER_SPI_ioctl:
+ 1561              	.LVL173:
+ 1562              	.LFB147:
+ 504:FATFS/Target/user_diskio_spi.c **** #endif
+ 505:FATFS/Target/user_diskio_spi.c **** 
+ 506:FATFS/Target/user_diskio_spi.c **** /*-----------------------------------------------------------------------*/
+ 507:FATFS/Target/user_diskio_spi.c **** /* Miscellaneous drive controls other than data read/write               */
+ 508:FATFS/Target/user_diskio_spi.c **** /*-----------------------------------------------------------------------*/
+ 509:FATFS/Target/user_diskio_spi.c **** 
+ 510:FATFS/Target/user_diskio_spi.c **** #if _USE_IOCTL
+ 511:FATFS/Target/user_diskio_spi.c **** inline DRESULT USER_SPI_ioctl(
+ 512:FATFS/Target/user_diskio_spi.c **** 	BYTE drv,  /* Physical drive number (0) */
+ 513:FATFS/Target/user_diskio_spi.c **** 	BYTE cmd,  /* Control command code */
+ 514:FATFS/Target/user_diskio_spi.c **** 	void *buff /* Pointer to the conrtol data */
+ 515:FATFS/Target/user_diskio_spi.c **** )
+ 516:FATFS/Target/user_diskio_spi.c **** {
+ 1563              		.loc 1 516 1 is_stmt 1 view -0
+ 1564              		.cfi_startproc
+ 1565              		@ args = 0, pretend = 0, frame = 16
+ 1566              		@ frame_needed = 0, uses_anonymous_args = 0
+ 1567              		.loc 1 516 1 is_stmt 0 view .LVU403
+ 1568 0000 70B5     		push	{r4, r5, r6, lr}
+ 1569              	.LCFI26:
+ 1570              		.cfi_def_cfa_offset 16
+ 1571              		.cfi_offset 4, -16
+ 1572              		.cfi_offset 5, -12
+ARM GAS  C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s 			page 41
+
+
+ 1573              		.cfi_offset 6, -8
+ 1574              		.cfi_offset 14, -4
+ 1575 0002 84B0     		sub	sp, sp, #16
+ 1576              	.LCFI27:
+ 1577              		.cfi_def_cfa_offset 32
+ 517:FATFS/Target/user_diskio_spi.c **** 	DRESULT res;
+ 1578              		.loc 1 517 2 is_stmt 1 view .LVU404
+ 518:FATFS/Target/user_diskio_spi.c **** 	BYTE n, csd[16];
+ 1579              		.loc 1 518 2 view .LVU405
+ 519:FATFS/Target/user_diskio_spi.c **** 	DWORD *dp, st, ed, csize;
+ 1580              		.loc 1 519 2 view .LVU406
+ 520:FATFS/Target/user_diskio_spi.c **** 
+ 521:FATFS/Target/user_diskio_spi.c **** 	if (drv)
+ 1581              		.loc 1 521 2 view .LVU407
+ 1582              		.loc 1 521 5 is_stmt 0 view .LVU408
+ 1583 0004 0028     		cmp	r0, #0
+ 1584 0006 40F00481 		bne	.L161
+ 1585 000a 0D46     		mov	r5, r1
+ 1586 000c 1646     		mov	r6, r2
+ 522:FATFS/Target/user_diskio_spi.c **** 		return RES_PARERR; /* Check parameter */
+ 523:FATFS/Target/user_diskio_spi.c **** 	if (Stat & STA_NOINIT)
+ 1587              		.loc 1 523 2 is_stmt 1 view .LVU409
+ 1588              		.loc 1 523 11 is_stmt 0 view .LVU410
+ 1589 000e 834B     		ldr	r3, .L186
+ 1590 0010 1B78     		ldrb	r3, [r3]	@ zero_extendqisi2
+ 1591              		.loc 1 523 5 view .LVU411
+ 1592 0012 13F0010F 		tst	r3, #1
+ 1593 0016 40F0FE80 		bne	.L162
+ 524:FATFS/Target/user_diskio_spi.c **** 		return RES_NOTRDY; /* Check if drive is ready */
+ 525:FATFS/Target/user_diskio_spi.c **** 
+ 526:FATFS/Target/user_diskio_spi.c **** 	res = RES_ERROR;
+ 1594              		.loc 1 526 2 is_stmt 1 view .LVU412
+ 1595              	.LVL174:
+ 527:FATFS/Target/user_diskio_spi.c **** 
+ 528:FATFS/Target/user_diskio_spi.c **** 	switch (cmd)
+ 1596              		.loc 1 528 2 view .LVU413
+ 1597 001a 0429     		cmp	r1, #4
+ 1598 001c 00F2ED80 		bhi	.L163
+ 1599 0020 DFE811F0 		tbh	[pc, r1, lsl #1]
+ 1600              	.L150:
+ 1601 0024 0500     		.2byte	(.L153-.L150)/2
+ 1602 0026 0C00     		.2byte	(.L152-.L150)/2
+ 1603 0028 EB00     		.2byte	(.L163-.L150)/2
+ 1604 002a 5400     		.2byte	(.L151-.L150)/2
+ 1605 002c AF00     		.2byte	(.L149-.L150)/2
+ 1606              		.p2align 1
+ 1607              	.L153:
+ 529:FATFS/Target/user_diskio_spi.c **** 	{
+ 530:FATFS/Target/user_diskio_spi.c **** 	case CTRL_SYNC: /* Wait for end of internal write process of the drive */
+ 531:FATFS/Target/user_diskio_spi.c **** 		if (spiselect())
+ 1608              		.loc 1 531 3 view .LVU414
+ 1609              		.loc 1 531 7 is_stmt 0 view .LVU415
+ 1610 002e FFF7FEFF 		bl	spiselect
+ 1611              	.LVL175:
+ 1612              		.loc 1 531 6 view .LVU416
+ 1613 0032 0028     		cmp	r0, #0
+ 1614 0034 40F0E380 		bne	.L164
+ARM GAS  C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s 			page 42
+
+
+ 526:FATFS/Target/user_diskio_spi.c **** 
+ 1615              		.loc 1 526 6 view .LVU417
+ 1616 0038 0124     		movs	r4, #1
+ 1617 003a 06E0     		b	.L148
+ 1618              	.LVL176:
+ 1619              	.L152:
+ 532:FATFS/Target/user_diskio_spi.c **** 			res = RES_OK;
+ 533:FATFS/Target/user_diskio_spi.c **** 		break;
+ 534:FATFS/Target/user_diskio_spi.c **** 
+ 535:FATFS/Target/user_diskio_spi.c **** 	case GET_SECTOR_COUNT: /* Get drive capacity in unit of sector (DWORD) */
+ 536:FATFS/Target/user_diskio_spi.c **** 		if ((send_cmd(CMD9, 0) == 0) && rcvr_datablock(csd, 16))
+ 1620              		.loc 1 536 3 is_stmt 1 view .LVU418
+ 1621              		.loc 1 536 8 is_stmt 0 view .LVU419
+ 1622 003c 0021     		movs	r1, #0
+ 1623              	.LVL177:
+ 1624              		.loc 1 536 8 view .LVU420
+ 1625 003e 0920     		movs	r0, #9
+ 1626              	.LVL178:
+ 1627              		.loc 1 536 8 view .LVU421
+ 1628 0040 FFF7FEFF 		bl	send_cmd
+ 1629              	.LVL179:
+ 1630              		.loc 1 536 6 view .LVU422
+ 1631 0044 0446     		mov	r4, r0
+ 1632 0046 28B1     		cbz	r0, .L178
+ 526:FATFS/Target/user_diskio_spi.c **** 
+ 1633              		.loc 1 526 6 view .LVU423
+ 1634 0048 2C46     		mov	r4, r5
+ 1635              	.LVL180:
+ 1636              	.L148:
+ 537:FATFS/Target/user_diskio_spi.c **** 		{
+ 538:FATFS/Target/user_diskio_spi.c **** 			if ((csd[0] >> 6) == 1)
+ 539:FATFS/Target/user_diskio_spi.c **** 			{ /* SDC ver 2.00 */
+ 540:FATFS/Target/user_diskio_spi.c **** 				csize = csd[9] + ((WORD)csd[8] << 8) + ((DWORD)(csd[7] & 63) << 16) + 1;
+ 541:FATFS/Target/user_diskio_spi.c **** 				*(DWORD *)buff = csize << 10;
+ 542:FATFS/Target/user_diskio_spi.c **** 			}
+ 543:FATFS/Target/user_diskio_spi.c **** 			else
+ 544:FATFS/Target/user_diskio_spi.c **** 			{ /* SDC ver 1.XX or MMC ver 3 */
+ 545:FATFS/Target/user_diskio_spi.c **** 				n = (csd[5] & 15) + ((csd[10] & 128) >> 7) + ((csd[9] & 3) << 1) + 2;
+ 546:FATFS/Target/user_diskio_spi.c **** 				csize = (csd[8] >> 6) + ((WORD)csd[7] << 2) + ((WORD)(csd[6] & 3) << 10) + 1;
+ 547:FATFS/Target/user_diskio_spi.c **** 				*(DWORD *)buff = csize << (n - 9);
+ 548:FATFS/Target/user_diskio_spi.c **** 			}
+ 549:FATFS/Target/user_diskio_spi.c **** 			res = RES_OK;
+ 550:FATFS/Target/user_diskio_spi.c **** 		}
+ 551:FATFS/Target/user_diskio_spi.c **** 		break;
+ 552:FATFS/Target/user_diskio_spi.c **** 
+ 553:FATFS/Target/user_diskio_spi.c **** 	case GET_BLOCK_SIZE: /* Get erase block size in unit of sector (DWORD) */
+ 554:FATFS/Target/user_diskio_spi.c **** 		if (CardType & CT_SD2)
+ 555:FATFS/Target/user_diskio_spi.c **** 		{ /* SDC ver 2.00 */
+ 556:FATFS/Target/user_diskio_spi.c **** 			if (send_cmd(ACMD13, 0) == 0)
+ 557:FATFS/Target/user_diskio_spi.c **** 			{ /* Read SD status */
+ 558:FATFS/Target/user_diskio_spi.c **** 				xchg_spi(0xFF);
+ 559:FATFS/Target/user_diskio_spi.c **** 				if (rcvr_datablock(csd, 16))
+ 560:FATFS/Target/user_diskio_spi.c **** 				{ /* Read partial block */
+ 561:FATFS/Target/user_diskio_spi.c **** 					for (n = 64 - 16; n; n--)
+ 562:FATFS/Target/user_diskio_spi.c **** 						xchg_spi(0xFF); /* Purge trailing data */
+ 563:FATFS/Target/user_diskio_spi.c **** 					*(DWORD *)buff = 16UL << (csd[10] >> 4);
+ 564:FATFS/Target/user_diskio_spi.c **** 					res = RES_OK;
+ARM GAS  C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s 			page 43
+
+
+ 565:FATFS/Target/user_diskio_spi.c **** 				}
+ 566:FATFS/Target/user_diskio_spi.c **** 			}
+ 567:FATFS/Target/user_diskio_spi.c **** 		}
+ 568:FATFS/Target/user_diskio_spi.c **** 		else
+ 569:FATFS/Target/user_diskio_spi.c **** 		{ /* SDC ver 1.XX or MMC */
+ 570:FATFS/Target/user_diskio_spi.c **** 			if ((send_cmd(CMD9, 0) == 0) && rcvr_datablock(csd, 16))
+ 571:FATFS/Target/user_diskio_spi.c **** 			{ /* Read CSD */
+ 572:FATFS/Target/user_diskio_spi.c **** 				if (CardType & CT_SD1)
+ 573:FATFS/Target/user_diskio_spi.c **** 				{ /* SDC ver 1.XX */
+ 574:FATFS/Target/user_diskio_spi.c **** 					*(DWORD *)buff = (((csd[10] & 63) << 1) + ((WORD)(csd[11] & 128) >> 7) + 1) << ((csd[13] >> 6)
+ 575:FATFS/Target/user_diskio_spi.c **** 				}
+ 576:FATFS/Target/user_diskio_spi.c **** 				else
+ 577:FATFS/Target/user_diskio_spi.c **** 				{ /* MMC */
+ 578:FATFS/Target/user_diskio_spi.c **** 					*(DWORD *)buff = ((WORD)((csd[10] & 124) >> 2) + 1) * (((csd[11] & 3) << 3) + ((csd[11] & 224)
+ 579:FATFS/Target/user_diskio_spi.c **** 				}
+ 580:FATFS/Target/user_diskio_spi.c **** 				res = RES_OK;
+ 581:FATFS/Target/user_diskio_spi.c **** 			}
+ 582:FATFS/Target/user_diskio_spi.c **** 		}
+ 583:FATFS/Target/user_diskio_spi.c **** 		break;
+ 584:FATFS/Target/user_diskio_spi.c **** 
+ 585:FATFS/Target/user_diskio_spi.c **** 	case CTRL_TRIM: /* Erase a block of sectors (used when _USE_ERASE == 1) */
+ 586:FATFS/Target/user_diskio_spi.c **** 		if (!(CardType & CT_SDC))
+ 587:FATFS/Target/user_diskio_spi.c **** 			break; /* Check if the card is SDC */
+ 588:FATFS/Target/user_diskio_spi.c **** 		if (USER_SPI_ioctl(drv, MMC_GET_CSD, csd))
+ 589:FATFS/Target/user_diskio_spi.c **** 			break; /* Get CSD */
+ 590:FATFS/Target/user_diskio_spi.c **** 		if (!(csd[0] >> 6) && !(csd[10] & 0x40))
+ 591:FATFS/Target/user_diskio_spi.c **** 			break; /* Check if sector erase can be applied to the card */
+ 592:FATFS/Target/user_diskio_spi.c **** 		dp = buff;
+ 593:FATFS/Target/user_diskio_spi.c **** 		st = dp[0];
+ 594:FATFS/Target/user_diskio_spi.c **** 		ed = dp[1]; /* Load sector block */
+ 595:FATFS/Target/user_diskio_spi.c **** 		if (!(CardType & CT_BLOCK))
+ 596:FATFS/Target/user_diskio_spi.c **** 		{
+ 597:FATFS/Target/user_diskio_spi.c **** 			st *= 512;
+ 598:FATFS/Target/user_diskio_spi.c **** 			ed *= 512;
+ 599:FATFS/Target/user_diskio_spi.c **** 		}
+ 600:FATFS/Target/user_diskio_spi.c **** 		if (send_cmd(CMD32, st) == 0 && send_cmd(CMD33, ed) == 0 && send_cmd(CMD38, 0) == 0 && wait_ready
+ 601:FATFS/Target/user_diskio_spi.c **** 		{				  /* Erase sector block */
+ 602:FATFS/Target/user_diskio_spi.c **** 			res = RES_OK; /* FatFs does not check result of this command */
+ 603:FATFS/Target/user_diskio_spi.c **** 		}
+ 604:FATFS/Target/user_diskio_spi.c **** 		break;
+ 605:FATFS/Target/user_diskio_spi.c **** 
+ 606:FATFS/Target/user_diskio_spi.c **** 	default:
+ 607:FATFS/Target/user_diskio_spi.c **** 		res = RES_PARERR;
+ 608:FATFS/Target/user_diskio_spi.c **** 	}
+ 609:FATFS/Target/user_diskio_spi.c **** 
+ 610:FATFS/Target/user_diskio_spi.c **** 	despiselect();
+ 1637              		.loc 1 610 2 is_stmt 1 view .LVU424
+ 1638 004a FFF7FEFF 		bl	despiselect
+ 1639              	.LVL181:
+ 611:FATFS/Target/user_diskio_spi.c **** 
+ 612:FATFS/Target/user_diskio_spi.c **** 	return res;
+ 1640              		.loc 1 612 2 view .LVU425
+ 1641              	.L147:
+ 613:FATFS/Target/user_diskio_spi.c **** }
+ 1642              		.loc 1 613 1 is_stmt 0 view .LVU426
+ 1643 004e 2046     		mov	r0, r4
+ 1644 0050 04B0     		add	sp, sp, #16
+ARM GAS  C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s 			page 44
+
+
+ 1645              	.LCFI28:
+ 1646              		.cfi_remember_state
+ 1647              		.cfi_def_cfa_offset 16
+ 1648              		@ sp needed
+ 1649 0052 70BD     		pop	{r4, r5, r6, pc}
+ 1650              	.LVL182:
+ 1651              	.L178:
+ 1652              	.LCFI29:
+ 1653              		.cfi_restore_state
+ 536:FATFS/Target/user_diskio_spi.c **** 		{
+ 1654              		.loc 1 536 35 discriminator 1 view .LVU427
+ 1655 0054 1021     		movs	r1, #16
+ 1656 0056 6846     		mov	r0, sp
+ 1657 0058 FFF7FEFF 		bl	rcvr_datablock
+ 1658              	.LVL183:
+ 536:FATFS/Target/user_diskio_spi.c **** 		{
+ 1659              		.loc 1 536 32 discriminator 1 view .LVU428
+ 1660 005c 0028     		cmp	r0, #0
+ 1661 005e 00F0D080 		beq	.L166
+ 538:FATFS/Target/user_diskio_spi.c **** 			{ /* SDC ver 2.00 */
+ 1662              		.loc 1 538 4 is_stmt 1 view .LVU429
+ 538:FATFS/Target/user_diskio_spi.c **** 			{ /* SDC ver 2.00 */
+ 1663              		.loc 1 538 12 is_stmt 0 view .LVU430
+ 1664 0062 9DF80030 		ldrb	r3, [sp]	@ zero_extendqisi2
+ 538:FATFS/Target/user_diskio_spi.c **** 			{ /* SDC ver 2.00 */
+ 1665              		.loc 1 538 22 view .LVU431
+ 1666 0066 9B09     		lsrs	r3, r3, #6
+ 538:FATFS/Target/user_diskio_spi.c **** 			{ /* SDC ver 2.00 */
+ 1667              		.loc 1 538 7 view .LVU432
+ 1668 0068 012B     		cmp	r3, #1
+ 1669 006a 1FD0     		beq	.L179
+ 545:FATFS/Target/user_diskio_spi.c **** 				csize = (csd[8] >> 6) + ((WORD)csd[7] << 2) + ((WORD)(csd[6] & 3) << 10) + 1;
+ 1670              		.loc 1 545 5 is_stmt 1 view .LVU433
+ 545:FATFS/Target/user_diskio_spi.c **** 				csize = (csd[8] >> 6) + ((WORD)csd[7] << 2) + ((WORD)(csd[6] & 3) << 10) + 1;
+ 1671              		.loc 1 545 13 is_stmt 0 view .LVU434
+ 1672 006c 9DF80520 		ldrb	r2, [sp, #5]	@ zero_extendqisi2
+ 545:FATFS/Target/user_diskio_spi.c **** 				csize = (csd[8] >> 6) + ((WORD)csd[7] << 2) + ((WORD)(csd[6] & 3) << 10) + 1;
+ 1673              		.loc 1 545 17 view .LVU435
+ 1674 0070 02F00F02 		and	r2, r2, #15
+ 545:FATFS/Target/user_diskio_spi.c **** 				csize = (csd[8] >> 6) + ((WORD)csd[7] << 2) + ((WORD)(csd[6] & 3) << 10) + 1;
+ 1675              		.loc 1 545 30 view .LVU436
+ 1676 0074 9DF80A30 		ldrb	r3, [sp, #10]	@ zero_extendqisi2
+ 545:FATFS/Target/user_diskio_spi.c **** 				csize = (csd[8] >> 6) + ((WORD)csd[7] << 2) + ((WORD)(csd[6] & 3) << 10) + 1;
+ 1677              		.loc 1 545 23 view .LVU437
+ 1678 0078 02EBD312 		add	r2, r2, r3, lsr #7
+ 545:FATFS/Target/user_diskio_spi.c **** 				csize = (csd[8] >> 6) + ((WORD)csd[7] << 2) + ((WORD)(csd[6] & 3) << 10) + 1;
+ 1679              		.loc 1 545 55 view .LVU438
+ 1680 007c 9DF80930 		ldrb	r3, [sp, #9]	@ zero_extendqisi2
+ 545:FATFS/Target/user_diskio_spi.c **** 				csize = (csd[8] >> 6) + ((WORD)csd[7] << 2) + ((WORD)(csd[6] & 3) << 10) + 1;
+ 1681              		.loc 1 545 64 view .LVU439
+ 1682 0080 5B00     		lsls	r3, r3, #1
+ 1683 0082 03F00603 		and	r3, r3, #6
+ 545:FATFS/Target/user_diskio_spi.c **** 				csize = (csd[8] >> 6) + ((WORD)csd[7] << 2) + ((WORD)(csd[6] & 3) << 10) + 1;
+ 1684              		.loc 1 545 48 view .LVU440
+ 1685 0086 1A44     		add	r2, r2, r3
+ 1686              	.LVL184:
+ 546:FATFS/Target/user_diskio_spi.c **** 				*(DWORD *)buff = csize << (n - 9);
+ARM GAS  C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s 			page 45
+
+
+ 1687              		.loc 1 546 5 is_stmt 1 view .LVU441
+ 546:FATFS/Target/user_diskio_spi.c **** 				*(DWORD *)buff = csize << (n - 9);
+ 1688              		.loc 1 546 17 is_stmt 0 view .LVU442
+ 1689 0088 9DF80810 		ldrb	r1, [sp, #8]	@ zero_extendqisi2
+ 546:FATFS/Target/user_diskio_spi.c **** 				*(DWORD *)buff = csize << (n - 9);
+ 1690              		.loc 1 546 39 view .LVU443
+ 1691 008c 9DF80730 		ldrb	r3, [sp, #7]	@ zero_extendqisi2
+ 546:FATFS/Target/user_diskio_spi.c **** 				*(DWORD *)buff = csize << (n - 9);
+ 1692              		.loc 1 546 43 view .LVU444
+ 1693 0090 9B00     		lsls	r3, r3, #2
+ 546:FATFS/Target/user_diskio_spi.c **** 				*(DWORD *)buff = csize << (n - 9);
+ 1694              		.loc 1 546 27 view .LVU445
+ 1695 0092 03EB9113 		add	r3, r3, r1, lsr #6
+ 546:FATFS/Target/user_diskio_spi.c **** 				*(DWORD *)buff = csize << (n - 9);
+ 1696              		.loc 1 546 62 view .LVU446
+ 1697 0096 9DF80610 		ldrb	r1, [sp, #6]	@ zero_extendqisi2
+ 546:FATFS/Target/user_diskio_spi.c **** 				*(DWORD *)buff = csize << (n - 9);
+ 1698              		.loc 1 546 71 view .LVU447
+ 1699 009a 8902     		lsls	r1, r1, #10
+ 1700 009c 01F44061 		and	r1, r1, #3072
+ 546:FATFS/Target/user_diskio_spi.c **** 				*(DWORD *)buff = csize << (n - 9);
+ 1701              		.loc 1 546 49 view .LVU448
+ 1702 00a0 0B44     		add	r3, r3, r1
+ 546:FATFS/Target/user_diskio_spi.c **** 				*(DWORD *)buff = csize << (n - 9);
+ 1703              		.loc 1 546 78 view .LVU449
+ 1704 00a2 0133     		adds	r3, r3, #1
+ 1705              	.LVL185:
+ 547:FATFS/Target/user_diskio_spi.c **** 			}
+ 1706              		.loc 1 547 5 is_stmt 1 view .LVU450
+ 547:FATFS/Target/user_diskio_spi.c **** 			}
+ 1707              		.loc 1 547 34 is_stmt 0 view .LVU451
+ 1708 00a4 073A     		subs	r2, r2, #7
+ 1709              	.LVL186:
+ 547:FATFS/Target/user_diskio_spi.c **** 			}
+ 1710              		.loc 1 547 28 view .LVU452
+ 1711 00a6 9340     		lsls	r3, r3, r2
+ 1712              	.LVL187:
+ 547:FATFS/Target/user_diskio_spi.c **** 			}
+ 1713              		.loc 1 547 20 view .LVU453
+ 1714 00a8 3360     		str	r3, [r6]
+ 1715              	.LVL188:
+ 547:FATFS/Target/user_diskio_spi.c **** 			}
+ 1716              		.loc 1 547 20 view .LVU454
+ 1717 00aa CEE7     		b	.L148
+ 1718              	.LVL189:
+ 1719              	.L179:
+ 540:FATFS/Target/user_diskio_spi.c **** 				*(DWORD *)buff = csize << 10;
+ 1720              		.loc 1 540 5 is_stmt 1 view .LVU455
+ 540:FATFS/Target/user_diskio_spi.c **** 				*(DWORD *)buff = csize << 10;
+ 1721              		.loc 1 540 16 is_stmt 0 view .LVU456
+ 1722 00ac 9DF80930 		ldrb	r3, [sp, #9]	@ zero_extendqisi2
+ 540:FATFS/Target/user_diskio_spi.c **** 				*(DWORD *)buff = csize << 10;
+ 1723              		.loc 1 540 32 view .LVU457
+ 1724 00b0 9DF80820 		ldrb	r2, [sp, #8]	@ zero_extendqisi2
+ 540:FATFS/Target/user_diskio_spi.c **** 				*(DWORD *)buff = csize << 10;
+ 1725              		.loc 1 540 20 view .LVU458
+ 1726 00b4 03EB0223 		add	r3, r3, r2, lsl #8
+ARM GAS  C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s 			page 46
+
+
+ 540:FATFS/Target/user_diskio_spi.c **** 				*(DWORD *)buff = csize << 10;
+ 1727              		.loc 1 540 56 view .LVU459
+ 1728 00b8 9DF80720 		ldrb	r2, [sp, #7]	@ zero_extendqisi2
+ 540:FATFS/Target/user_diskio_spi.c **** 				*(DWORD *)buff = csize << 10;
+ 1729              		.loc 1 540 66 view .LVU460
+ 1730 00bc 1204     		lsls	r2, r2, #16
+ 1731 00be 02F47C12 		and	r2, r2, #4128768
+ 540:FATFS/Target/user_diskio_spi.c **** 				*(DWORD *)buff = csize << 10;
+ 1732              		.loc 1 540 42 view .LVU461
+ 1733 00c2 1344     		add	r3, r3, r2
+ 540:FATFS/Target/user_diskio_spi.c **** 				*(DWORD *)buff = csize << 10;
+ 1734              		.loc 1 540 11 view .LVU462
+ 1735 00c4 0133     		adds	r3, r3, #1
+ 1736              	.LVL190:
+ 541:FATFS/Target/user_diskio_spi.c **** 			}
+ 1737              		.loc 1 541 5 is_stmt 1 view .LVU463
+ 541:FATFS/Target/user_diskio_spi.c **** 			}
+ 1738              		.loc 1 541 28 is_stmt 0 view .LVU464
+ 1739 00c6 9B02     		lsls	r3, r3, #10
+ 1740              	.LVL191:
+ 541:FATFS/Target/user_diskio_spi.c **** 			}
+ 1741              		.loc 1 541 20 view .LVU465
+ 1742 00c8 3360     		str	r3, [r6]
+ 1743              	.LVL192:
+ 541:FATFS/Target/user_diskio_spi.c **** 			}
+ 1744              		.loc 1 541 20 view .LVU466
+ 1745 00ca BEE7     		b	.L148
+ 1746              	.LVL193:
+ 1747              	.L151:
+ 554:FATFS/Target/user_diskio_spi.c **** 		{ /* SDC ver 2.00 */
+ 1748              		.loc 1 554 3 is_stmt 1 view .LVU467
+ 554:FATFS/Target/user_diskio_spi.c **** 		{ /* SDC ver 2.00 */
+ 1749              		.loc 1 554 16 is_stmt 0 view .LVU468
+ 1750 00cc 544B     		ldr	r3, .L186+4
+ 1751 00ce 1B78     		ldrb	r3, [r3]	@ zero_extendqisi2
+ 554:FATFS/Target/user_diskio_spi.c **** 		{ /* SDC ver 2.00 */
+ 1752              		.loc 1 554 6 view .LVU469
+ 1753 00d0 13F0040F 		tst	r3, #4
+ 1754 00d4 20D0     		beq	.L155
+ 556:FATFS/Target/user_diskio_spi.c **** 			{ /* Read SD status */
+ 1755              		.loc 1 556 4 is_stmt 1 view .LVU470
+ 556:FATFS/Target/user_diskio_spi.c **** 			{ /* Read SD status */
+ 1756              		.loc 1 556 8 is_stmt 0 view .LVU471
+ 1757 00d6 0021     		movs	r1, #0
+ 1758              	.LVL194:
+ 556:FATFS/Target/user_diskio_spi.c **** 			{ /* Read SD status */
+ 1759              		.loc 1 556 8 view .LVU472
+ 1760 00d8 8D20     		movs	r0, #141
+ 1761              	.LVL195:
+ 556:FATFS/Target/user_diskio_spi.c **** 			{ /* Read SD status */
+ 1762              		.loc 1 556 8 view .LVU473
+ 1763 00da FFF7FEFF 		bl	send_cmd
+ 1764              	.LVL196:
+ 556:FATFS/Target/user_diskio_spi.c **** 			{ /* Read SD status */
+ 1765              		.loc 1 556 7 view .LVU474
+ 1766 00de 08B1     		cbz	r0, .L180
+ 526:FATFS/Target/user_diskio_spi.c **** 
+ARM GAS  C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s 			page 47
+
+
+ 1767              		.loc 1 526 6 view .LVU475
+ 1768 00e0 0124     		movs	r4, #1
+ 1769 00e2 B2E7     		b	.L148
+ 1770              	.L180:
+ 558:FATFS/Target/user_diskio_spi.c **** 				if (rcvr_datablock(csd, 16))
+ 1771              		.loc 1 558 5 is_stmt 1 view .LVU476
+ 1772 00e4 FF20     		movs	r0, #255
+ 1773 00e6 FFF7FEFF 		bl	xchg_spi
+ 1774              	.LVL197:
+ 559:FATFS/Target/user_diskio_spi.c **** 				{ /* Read partial block */
+ 1775              		.loc 1 559 5 view .LVU477
+ 559:FATFS/Target/user_diskio_spi.c **** 				{ /* Read partial block */
+ 1776              		.loc 1 559 9 is_stmt 0 view .LVU478
+ 1777 00ea 1021     		movs	r1, #16
+ 1778 00ec 6846     		mov	r0, sp
+ 1779 00ee FFF7FEFF 		bl	rcvr_datablock
+ 1780              	.LVL198:
+ 559:FATFS/Target/user_diskio_spi.c **** 				{ /* Read partial block */
+ 1781              		.loc 1 559 8 view .LVU479
+ 1782 00f2 78B9     		cbnz	r0, .L168
+ 526:FATFS/Target/user_diskio_spi.c **** 
+ 1783              		.loc 1 526 6 view .LVU480
+ 1784 00f4 0124     		movs	r4, #1
+ 1785 00f6 A8E7     		b	.L148
+ 1786              	.LVL199:
+ 1787              	.L157:
+ 562:FATFS/Target/user_diskio_spi.c **** 					*(DWORD *)buff = 16UL << (csd[10] >> 4);
+ 1788              		.loc 1 562 7 is_stmt 1 discriminator 3 view .LVU481
+ 1789 00f8 FF20     		movs	r0, #255
+ 1790 00fa FFF7FEFF 		bl	xchg_spi
+ 1791              	.LVL200:
+ 561:FATFS/Target/user_diskio_spi.c **** 						xchg_spi(0xFF); /* Purge trailing data */
+ 1792              		.loc 1 561 27 discriminator 3 view .LVU482
+ 561:FATFS/Target/user_diskio_spi.c **** 						xchg_spi(0xFF); /* Purge trailing data */
+ 1793              		.loc 1 561 28 is_stmt 0 discriminator 3 view .LVU483
+ 1794 00fe 013C     		subs	r4, r4, #1
+ 1795              	.LVL201:
+ 561:FATFS/Target/user_diskio_spi.c **** 						xchg_spi(0xFF); /* Purge trailing data */
+ 1796              		.loc 1 561 28 discriminator 3 view .LVU484
+ 1797 0100 E4B2     		uxtb	r4, r4
+ 1798              	.LVL202:
+ 1799              	.L156:
+ 561:FATFS/Target/user_diskio_spi.c **** 						xchg_spi(0xFF); /* Purge trailing data */
+ 1800              		.loc 1 561 24 is_stmt 1 discriminator 1 view .LVU485
+ 561:FATFS/Target/user_diskio_spi.c **** 						xchg_spi(0xFF); /* Purge trailing data */
+ 1801              		.loc 1 561 6 is_stmt 0 discriminator 1 view .LVU486
+ 1802 0102 002C     		cmp	r4, #0
+ 1803 0104 F8D1     		bne	.L157
+ 563:FATFS/Target/user_diskio_spi.c **** 					res = RES_OK;
+ 1804              		.loc 1 563 6 is_stmt 1 view .LVU487
+ 563:FATFS/Target/user_diskio_spi.c **** 					res = RES_OK;
+ 1805              		.loc 1 563 35 is_stmt 0 view .LVU488
+ 1806 0106 9DF80A30 		ldrb	r3, [sp, #10]	@ zero_extendqisi2
+ 563:FATFS/Target/user_diskio_spi.c **** 					res = RES_OK;
+ 1807              		.loc 1 563 40 view .LVU489
+ 1808 010a 1A09     		lsrs	r2, r3, #4
+ 563:FATFS/Target/user_diskio_spi.c **** 					res = RES_OK;
+ARM GAS  C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s 			page 48
+
+
+ 1809              		.loc 1 563 28 view .LVU490
+ 1810 010c 1023     		movs	r3, #16
+ 1811 010e 9340     		lsls	r3, r3, r2
+ 563:FATFS/Target/user_diskio_spi.c **** 					res = RES_OK;
+ 1812              		.loc 1 563 21 view .LVU491
+ 1813 0110 3360     		str	r3, [r6]
+ 564:FATFS/Target/user_diskio_spi.c **** 				}
+ 1814              		.loc 1 564 6 is_stmt 1 view .LVU492
+ 1815              	.LVL203:
+ 564:FATFS/Target/user_diskio_spi.c **** 				}
+ 1816              		.loc 1 564 6 is_stmt 0 view .LVU493
+ 1817 0112 9AE7     		b	.L148
+ 1818              	.LVL204:
+ 1819              	.L168:
+ 561:FATFS/Target/user_diskio_spi.c **** 						xchg_spi(0xFF); /* Purge trailing data */
+ 1820              		.loc 1 561 13 view .LVU494
+ 1821 0114 3024     		movs	r4, #48
+ 1822 0116 F4E7     		b	.L156
+ 1823              	.LVL205:
+ 1824              	.L155:
+ 570:FATFS/Target/user_diskio_spi.c **** 			{ /* Read CSD */
+ 1825              		.loc 1 570 4 is_stmt 1 view .LVU495
+ 570:FATFS/Target/user_diskio_spi.c **** 			{ /* Read CSD */
+ 1826              		.loc 1 570 9 is_stmt 0 view .LVU496
+ 1827 0118 0021     		movs	r1, #0
+ 1828              	.LVL206:
+ 570:FATFS/Target/user_diskio_spi.c **** 			{ /* Read CSD */
+ 1829              		.loc 1 570 9 view .LVU497
+ 1830 011a 0920     		movs	r0, #9
+ 1831              	.LVL207:
+ 570:FATFS/Target/user_diskio_spi.c **** 			{ /* Read CSD */
+ 1832              		.loc 1 570 9 view .LVU498
+ 1833 011c FFF7FEFF 		bl	send_cmd
+ 1834              	.LVL208:
+ 570:FATFS/Target/user_diskio_spi.c **** 			{ /* Read CSD */
+ 1835              		.loc 1 570 7 view .LVU499
+ 1836 0120 0546     		mov	r5, r0
+ 1837 0122 08B1     		cbz	r0, .L181
+ 526:FATFS/Target/user_diskio_spi.c **** 
+ 1838              		.loc 1 526 6 view .LVU500
+ 1839 0124 0124     		movs	r4, #1
+ 1840 0126 90E7     		b	.L148
+ 1841              	.L181:
+ 570:FATFS/Target/user_diskio_spi.c **** 			{ /* Read CSD */
+ 1842              		.loc 1 570 36 discriminator 1 view .LVU501
+ 1843 0128 1021     		movs	r1, #16
+ 1844 012a 6846     		mov	r0, sp
+ 1845 012c FFF7FEFF 		bl	rcvr_datablock
+ 1846              	.LVL209:
+ 570:FATFS/Target/user_diskio_spi.c **** 			{ /* Read CSD */
+ 1847              		.loc 1 570 33 discriminator 1 view .LVU502
+ 1848 0130 0028     		cmp	r0, #0
+ 1849 0132 68D0     		beq	.L170
+ 572:FATFS/Target/user_diskio_spi.c **** 				{ /* SDC ver 1.XX */
+ 1850              		.loc 1 572 5 is_stmt 1 view .LVU503
+ 572:FATFS/Target/user_diskio_spi.c **** 				{ /* SDC ver 1.XX */
+ 1851              		.loc 1 572 18 is_stmt 0 view .LVU504
+ARM GAS  C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s 			page 49
+
+
+ 1852 0134 3A4B     		ldr	r3, .L186+4
+ 1853 0136 1C78     		ldrb	r4, [r3]	@ zero_extendqisi2
+ 572:FATFS/Target/user_diskio_spi.c **** 				{ /* SDC ver 1.XX */
+ 1854              		.loc 1 572 8 view .LVU505
+ 1855 0138 14F00204 		ands	r4, r4, #2
+ 1856 013c 11D0     		beq	.L158
+ 574:FATFS/Target/user_diskio_spi.c **** 				}
+ 1857              		.loc 1 574 6 is_stmt 1 view .LVU506
+ 574:FATFS/Target/user_diskio_spi.c **** 				}
+ 1858              		.loc 1 574 29 is_stmt 0 view .LVU507
+ 1859 013e 9DF80A30 		ldrb	r3, [sp, #10]	@ zero_extendqisi2
+ 574:FATFS/Target/user_diskio_spi.c **** 				}
+ 1860              		.loc 1 574 40 view .LVU508
+ 1861 0142 5B00     		lsls	r3, r3, #1
+ 1862 0144 03F07E03 		and	r3, r3, #126
+ 574:FATFS/Target/user_diskio_spi.c **** 				}
+ 1863              		.loc 1 574 59 view .LVU509
+ 1864 0148 9DF80B20 		ldrb	r2, [sp, #11]	@ zero_extendqisi2
+ 574:FATFS/Target/user_diskio_spi.c **** 				}
+ 1865              		.loc 1 574 46 view .LVU510
+ 1866 014c 03EBD213 		add	r3, r3, r2, lsr #7
+ 574:FATFS/Target/user_diskio_spi.c **** 				}
+ 1867              		.loc 1 574 77 view .LVU511
+ 1868 0150 0133     		adds	r3, r3, #1
+ 574:FATFS/Target/user_diskio_spi.c **** 				}
+ 1869              		.loc 1 574 90 view .LVU512
+ 1870 0152 9DF80D20 		ldrb	r2, [sp, #13]	@ zero_extendqisi2
+ 574:FATFS/Target/user_diskio_spi.c **** 				}
+ 1871              		.loc 1 574 95 view .LVU513
+ 1872 0156 9209     		lsrs	r2, r2, #6
+ 574:FATFS/Target/user_diskio_spi.c **** 				}
+ 1873              		.loc 1 574 101 view .LVU514
+ 1874 0158 013A     		subs	r2, r2, #1
+ 574:FATFS/Target/user_diskio_spi.c **** 				}
+ 1875              		.loc 1 574 82 view .LVU515
+ 1876 015a 9340     		lsls	r3, r3, r2
+ 574:FATFS/Target/user_diskio_spi.c **** 				}
+ 1877              		.loc 1 574 21 view .LVU516
+ 1878 015c 3360     		str	r3, [r6]
+ 580:FATFS/Target/user_diskio_spi.c **** 			}
+ 1879              		.loc 1 580 9 view .LVU517
+ 1880 015e 2C46     		mov	r4, r5
+ 1881 0160 73E7     		b	.L148
+ 1882              	.L158:
+ 578:FATFS/Target/user_diskio_spi.c **** 				}
+ 1883              		.loc 1 578 6 is_stmt 1 view .LVU518
+ 578:FATFS/Target/user_diskio_spi.c **** 				}
+ 1884              		.loc 1 578 35 is_stmt 0 view .LVU519
+ 1885 0162 9DF80A30 		ldrb	r3, [sp, #10]	@ zero_extendqisi2
+ 578:FATFS/Target/user_diskio_spi.c **** 				}
+ 1886              		.loc 1 578 24 view .LVU520
+ 1887 0166 C3F38402 		ubfx	r2, r3, #2, #5
+ 578:FATFS/Target/user_diskio_spi.c **** 				}
+ 1888              		.loc 1 578 66 view .LVU521
+ 1889 016a 9DF80B10 		ldrb	r1, [sp, #11]	@ zero_extendqisi2
+ 578:FATFS/Target/user_diskio_spi.c **** 				}
+ 1890              		.loc 1 578 76 view .LVU522
+ARM GAS  C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s 			page 50
+
+
+ 1891 016e CB00     		lsls	r3, r1, #3
+ 1892 0170 03F01803 		and	r3, r3, #24
+ 578:FATFS/Target/user_diskio_spi.c **** 				}
+ 1893              		.loc 1 578 82 view .LVU523
+ 1894 0174 03EB5113 		add	r3, r3, r1, lsr #5
+ 578:FATFS/Target/user_diskio_spi.c **** 				}
+ 1895              		.loc 1 578 107 view .LVU524
+ 1896 0178 0133     		adds	r3, r3, #1
+ 578:FATFS/Target/user_diskio_spi.c **** 				}
+ 1897              		.loc 1 578 58 view .LVU525
+ 1898 017a 02FB0333 		mla	r3, r2, r3, r3
+ 578:FATFS/Target/user_diskio_spi.c **** 				}
+ 1899              		.loc 1 578 21 view .LVU526
+ 1900 017e 3360     		str	r3, [r6]
+ 1901 0180 63E7     		b	.L148
+ 1902              	.LVL210:
+ 1903              	.L149:
+ 586:FATFS/Target/user_diskio_spi.c **** 			break; /* Check if the card is SDC */
+ 1904              		.loc 1 586 3 is_stmt 1 view .LVU527
+ 586:FATFS/Target/user_diskio_spi.c **** 			break; /* Check if the card is SDC */
+ 1905              		.loc 1 586 18 is_stmt 0 view .LVU528
+ 1906 0182 274B     		ldr	r3, .L186+4
+ 1907 0184 1B78     		ldrb	r3, [r3]	@ zero_extendqisi2
+ 586:FATFS/Target/user_diskio_spi.c **** 			break; /* Check if the card is SDC */
+ 1908              		.loc 1 586 6 view .LVU529
+ 1909 0186 13F0060F 		tst	r3, #6
+ 1910 018a 01D1     		bne	.L182
+ 526:FATFS/Target/user_diskio_spi.c **** 
+ 1911              		.loc 1 526 6 view .LVU530
+ 1912 018c 0124     		movs	r4, #1
+ 1913 018e 5CE7     		b	.L148
+ 1914              	.L182:
+ 588:FATFS/Target/user_diskio_spi.c **** 			break; /* Get CSD */
+ 1915              		.loc 1 588 3 is_stmt 1 view .LVU531
+ 588:FATFS/Target/user_diskio_spi.c **** 			break; /* Get CSD */
+ 1916              		.loc 1 588 7 is_stmt 0 view .LVU532
+ 1917 0190 6A46     		mov	r2, sp
+ 1918              	.LVL211:
+ 588:FATFS/Target/user_diskio_spi.c **** 			break; /* Get CSD */
+ 1919              		.loc 1 588 7 view .LVU533
+ 1920 0192 0B21     		movs	r1, #11
+ 1921              	.LVL212:
+ 588:FATFS/Target/user_diskio_spi.c **** 			break; /* Get CSD */
+ 1922              		.loc 1 588 7 view .LVU534
+ 1923 0194 FFF7FEFF 		bl	USER_SPI_ioctl
+ 1924              	.LVL213:
+ 588:FATFS/Target/user_diskio_spi.c **** 			break; /* Get CSD */
+ 1925              		.loc 1 588 6 view .LVU535
+ 1926 0198 B8BB     		cbnz	r0, .L172
+ 590:FATFS/Target/user_diskio_spi.c **** 			break; /* Check if sector erase can be applied to the card */
+ 1927              		.loc 1 590 3 is_stmt 1 view .LVU536
+ 590:FATFS/Target/user_diskio_spi.c **** 			break; /* Check if sector erase can be applied to the card */
+ 1928              		.loc 1 590 12 is_stmt 0 view .LVU537
+ 1929 019a 9DF80030 		ldrb	r3, [sp]	@ zero_extendqisi2
+ 590:FATFS/Target/user_diskio_spi.c **** 			break; /* Check if sector erase can be applied to the card */
+ 1930              		.loc 1 590 6 view .LVU538
+ 1931 019e 9B09     		lsrs	r3, r3, #6
+ARM GAS  C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s 			page 51
+
+
+ 1932 01a0 04D1     		bne	.L159
+ 590:FATFS/Target/user_diskio_spi.c **** 			break; /* Check if sector erase can be applied to the card */
+ 1933              		.loc 1 590 30 discriminator 1 view .LVU539
+ 1934 01a2 9DF80A30 		ldrb	r3, [sp, #10]	@ zero_extendqisi2
+ 590:FATFS/Target/user_diskio_spi.c **** 			break; /* Check if sector erase can be applied to the card */
+ 1935              		.loc 1 590 22 discriminator 1 view .LVU540
+ 1936 01a6 13F0400F 		tst	r3, #64
+ 1937 01aa 30D0     		beq	.L173
+ 1938              	.L159:
+ 592:FATFS/Target/user_diskio_spi.c **** 		st = dp[0];
+ 1939              		.loc 1 592 3 is_stmt 1 view .LVU541
+ 1940              	.LVL214:
+ 593:FATFS/Target/user_diskio_spi.c **** 		ed = dp[1]; /* Load sector block */
+ 1941              		.loc 1 593 3 view .LVU542
+ 593:FATFS/Target/user_diskio_spi.c **** 		ed = dp[1]; /* Load sector block */
+ 1942              		.loc 1 593 6 is_stmt 0 view .LVU543
+ 1943 01ac 3168     		ldr	r1, [r6]
+ 1944              	.LVL215:
+ 594:FATFS/Target/user_diskio_spi.c **** 		if (!(CardType & CT_BLOCK))
+ 1945              		.loc 1 594 3 is_stmt 1 view .LVU544
+ 594:FATFS/Target/user_diskio_spi.c **** 		if (!(CardType & CT_BLOCK))
+ 1946              		.loc 1 594 6 is_stmt 0 view .LVU545
+ 1947 01ae 7468     		ldr	r4, [r6, #4]
+ 1948              	.LVL216:
+ 595:FATFS/Target/user_diskio_spi.c **** 		{
+ 1949              		.loc 1 595 3 is_stmt 1 view .LVU546
+ 595:FATFS/Target/user_diskio_spi.c **** 		{
+ 1950              		.loc 1 595 18 is_stmt 0 view .LVU547
+ 1951 01b0 1B4B     		ldr	r3, .L186+4
+ 1952 01b2 1B78     		ldrb	r3, [r3]	@ zero_extendqisi2
+ 595:FATFS/Target/user_diskio_spi.c **** 		{
+ 1953              		.loc 1 595 6 view .LVU548
+ 1954 01b4 13F0080F 		tst	r3, #8
+ 1955 01b8 01D1     		bne	.L160
+ 597:FATFS/Target/user_diskio_spi.c **** 			ed *= 512;
+ 1956              		.loc 1 597 4 is_stmt 1 view .LVU549
+ 597:FATFS/Target/user_diskio_spi.c **** 			ed *= 512;
+ 1957              		.loc 1 597 7 is_stmt 0 view .LVU550
+ 1958 01ba 4902     		lsls	r1, r1, #9
+ 1959              	.LVL217:
+ 598:FATFS/Target/user_diskio_spi.c **** 		}
+ 1960              		.loc 1 598 4 is_stmt 1 view .LVU551
+ 598:FATFS/Target/user_diskio_spi.c **** 		}
+ 1961              		.loc 1 598 7 is_stmt 0 view .LVU552
+ 1962 01bc 6402     		lsls	r4, r4, #9
+ 1963              	.LVL218:
+ 1964              	.L160:
+ 600:FATFS/Target/user_diskio_spi.c **** 		{				  /* Erase sector block */
+ 1965              		.loc 1 600 3 is_stmt 1 view .LVU553
+ 600:FATFS/Target/user_diskio_spi.c **** 		{				  /* Erase sector block */
+ 1966              		.loc 1 600 7 is_stmt 0 view .LVU554
+ 1967 01be 2020     		movs	r0, #32
+ 1968 01c0 FFF7FEFF 		bl	send_cmd
+ 1969              	.LVL219:
+ 600:FATFS/Target/user_diskio_spi.c **** 		{				  /* Erase sector block */
+ 1970              		.loc 1 600 6 view .LVU555
+ 1971 01c4 08B1     		cbz	r0, .L183
+ARM GAS  C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s 			page 52
+
+
+ 526:FATFS/Target/user_diskio_spi.c **** 
+ 1972              		.loc 1 526 6 view .LVU556
+ 1973 01c6 0124     		movs	r4, #1
+ 1974              	.LVL220:
+ 526:FATFS/Target/user_diskio_spi.c **** 
+ 1975              		.loc 1 526 6 view .LVU557
+ 1976 01c8 3FE7     		b	.L148
+ 1977              	.LVL221:
+ 1978              	.L183:
+ 600:FATFS/Target/user_diskio_spi.c **** 		{				  /* Erase sector block */
+ 1979              		.loc 1 600 35 discriminator 1 view .LVU558
+ 1980 01ca 2146     		mov	r1, r4
+ 1981 01cc 2120     		movs	r0, #33
+ 1982 01ce FFF7FEFF 		bl	send_cmd
+ 1983              	.LVL222:
+ 600:FATFS/Target/user_diskio_spi.c **** 		{				  /* Erase sector block */
+ 1984              		.loc 1 600 32 discriminator 1 view .LVU559
+ 1985 01d2 08B1     		cbz	r0, .L184
+ 526:FATFS/Target/user_diskio_spi.c **** 
+ 1986              		.loc 1 526 6 view .LVU560
+ 1987 01d4 0124     		movs	r4, #1
+ 1988              	.LVL223:
+ 526:FATFS/Target/user_diskio_spi.c **** 
+ 1989              		.loc 1 526 6 view .LVU561
+ 1990 01d6 38E7     		b	.L148
+ 1991              	.LVL224:
+ 1992              	.L184:
+ 600:FATFS/Target/user_diskio_spi.c **** 		{				  /* Erase sector block */
+ 1993              		.loc 1 600 63 discriminator 2 view .LVU562
+ 1994 01d8 0021     		movs	r1, #0
+ 1995 01da 2620     		movs	r0, #38
+ 1996 01dc FFF7FEFF 		bl	send_cmd
+ 1997              	.LVL225:
+ 600:FATFS/Target/user_diskio_spi.c **** 		{				  /* Erase sector block */
+ 1998              		.loc 1 600 60 discriminator 2 view .LVU563
+ 1999 01e0 0446     		mov	r4, r0
+ 2000              	.LVL226:
+ 600:FATFS/Target/user_diskio_spi.c **** 		{				  /* Erase sector block */
+ 2001              		.loc 1 600 60 discriminator 2 view .LVU564
+ 2002 01e2 08B1     		cbz	r0, .L185
+ 526:FATFS/Target/user_diskio_spi.c **** 
+ 2003              		.loc 1 526 6 view .LVU565
+ 2004 01e4 0124     		movs	r4, #1
+ 2005 01e6 30E7     		b	.L148
+ 2006              	.L185:
+ 600:FATFS/Target/user_diskio_spi.c **** 		{				  /* Erase sector block */
+ 2007              		.loc 1 600 90 discriminator 3 view .LVU566
+ 2008 01e8 47F23050 		movw	r0, #30000
+ 2009 01ec FFF7FEFF 		bl	wait_ready
+ 2010              	.LVL227:
+ 600:FATFS/Target/user_diskio_spi.c **** 		{				  /* Erase sector block */
+ 2011              		.loc 1 600 87 discriminator 3 view .LVU567
+ 2012 01f0 0028     		cmp	r0, #0
+ 2013 01f2 7FF42AAF 		bne	.L148
+ 526:FATFS/Target/user_diskio_spi.c **** 
+ 2014              		.loc 1 526 6 view .LVU568
+ 2015 01f6 0124     		movs	r4, #1
+ARM GAS  C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s 			page 53
+
+
+ 2016 01f8 27E7     		b	.L148
+ 2017              	.LVL228:
+ 2018              	.L163:
+ 523:FATFS/Target/user_diskio_spi.c **** 		return RES_NOTRDY; /* Check if drive is ready */
+ 2019              		.loc 1 523 5 view .LVU569
+ 2020 01fa 0424     		movs	r4, #4
+ 2021 01fc 25E7     		b	.L148
+ 2022              	.LVL229:
+ 2023              	.L164:
+ 532:FATFS/Target/user_diskio_spi.c **** 		break;
+ 2024              		.loc 1 532 8 view .LVU570
+ 2025 01fe 2C46     		mov	r4, r5
+ 2026 0200 23E7     		b	.L148
+ 2027              	.L166:
+ 526:FATFS/Target/user_diskio_spi.c **** 
+ 2028              		.loc 1 526 6 view .LVU571
+ 2029 0202 2C46     		mov	r4, r5
+ 2030 0204 21E7     		b	.L148
+ 2031              	.L170:
+ 2032 0206 0124     		movs	r4, #1
+ 2033 0208 1FE7     		b	.L148
+ 2034              	.L172:
+ 2035 020a 0124     		movs	r4, #1
+ 2036 020c 1DE7     		b	.L148
+ 2037              	.L173:
+ 2038 020e 0124     		movs	r4, #1
+ 2039 0210 1BE7     		b	.L148
+ 2040              	.LVL230:
+ 2041              	.L161:
+ 522:FATFS/Target/user_diskio_spi.c **** 	if (Stat & STA_NOINIT)
+ 2042              		.loc 1 522 10 view .LVU572
+ 2043 0212 0424     		movs	r4, #4
+ 2044 0214 1BE7     		b	.L147
+ 2045              	.L162:
+ 524:FATFS/Target/user_diskio_spi.c **** 
+ 2046              		.loc 1 524 10 view .LVU573
+ 2047 0216 0324     		movs	r4, #3
+ 2048 0218 19E7     		b	.L147
+ 2049              	.L187:
+ 2050 021a 00BF     		.align	2
+ 2051              	.L186:
+ 2052 021c 00000000 		.word	.LANCHOR2
+ 2053 0220 00000000 		.word	.LANCHOR3
+ 2054              		.cfi_endproc
+ 2055              	.LFE147:
+ 2057              		.global	spiTimerTickDelay
+ 2058              		.global	spiTimerTickStart
+ 2059              		.section	.bss.CardType,"aw",%nobits
+ 2060              		.set	.LANCHOR3,. + 0
+ 2063              	CardType:
+ 2064 0000 00       		.space	1
+ 2065              		.section	.bss.spiTimerTickDelay,"aw",%nobits
+ 2066              		.align	2
+ 2067              		.set	.LANCHOR1,. + 0
+ 2070              	spiTimerTickDelay:
+ 2071 0000 00000000 		.space	4
+ 2072              		.section	.bss.spiTimerTickStart,"aw",%nobits
+ARM GAS  C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s 			page 54
+
+
+ 2073              		.align	2
+ 2074              		.set	.LANCHOR0,. + 0
+ 2077              	spiTimerTickStart:
+ 2078 0000 00000000 		.space	4
+ 2079              		.section	.data.Stat,"aw"
+ 2080              		.set	.LANCHOR2,. + 0
+ 2083              	Stat:
+ 2084 0000 01       		.byte	1
+ 2085              		.text
+ 2086              	.Letext0:
+ 2087              		.file 2 "d:\\msys64\\mingw64\\arm-none-eabi\\include\\machine\\_default_types.h"
+ 2088              		.file 3 "d:\\msys64\\mingw64\\arm-none-eabi\\include\\sys\\_stdint.h"
+ 2089              		.file 4 "Drivers/CMSIS/Device/ST/STM32G4xx/Include/stm32g431xx.h"
+ 2090              		.file 5 "Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_def.h"
+ 2091              		.file 6 "Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_gpio.h"
+ 2092              		.file 7 "Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_dma.h"
+ 2093              		.file 8 "Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_spi.h"
+ 2094              		.file 9 "Middlewares/Third_Party/FatFs/src/integer.h"
+ 2095              		.file 10 "Middlewares/Third_Party/FatFs/src/diskio.h"
+ 2096              		.file 11 "Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal.h"
+ARM GAS  C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s 			page 55
+
+
+DEFINED SYMBOLS
+                            *ABS*:0000000000000000 user_diskio_spi.c
+C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s:18     .text.xchg_spi:0000000000000000 $t
+C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s:25     .text.xchg_spi:0000000000000000 xchg_spi
+C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s:65     .text.xchg_spi:0000000000000028 $d
+C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s:70     .text.wait_ready:0000000000000000 $t
+C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s:76     .text.wait_ready:0000000000000000 wait_ready
+C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s:137    .text.rcvr_spi_multi:0000000000000000 $t
+C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s:143    .text.rcvr_spi_multi:0000000000000000 rcvr_spi_multi
+C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s:194    .text.xmit_spi_multi:0000000000000000 $t
+C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s:200    .text.xmit_spi_multi:0000000000000000 xmit_spi_multi
+C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s:248    .text.xmit_datablock:0000000000000000 $t
+C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s:254    .text.xmit_datablock:0000000000000000 xmit_datablock
+C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s:334    .text.despiselect:0000000000000000 $t
+C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s:340    .text.despiselect:0000000000000000 despiselect
+C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s:367    .text.despiselect:0000000000000018 $d
+C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s:372    .text.spiselect:0000000000000000 $t
+C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s:378    .text.spiselect:0000000000000000 spiselect
+C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s:424    .text.spiselect:000000000000002c $d
+C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s:429    .text.send_cmd:0000000000000000 $t
+C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s:435    .text.send_cmd:0000000000000000 send_cmd
+C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s:584    .text.SPI_Timer_On:0000000000000000 $t
+C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s:591    .text.SPI_Timer_On:0000000000000000 SPI_Timer_On
+C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s:623    .text.SPI_Timer_On:0000000000000014 $d
+C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s:629    .text.SPI_Timer_Status:0000000000000000 $t
+C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s:636    .text.SPI_Timer_Status:0000000000000000 SPI_Timer_Status
+C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s:667    .text.SPI_Timer_Status:000000000000001c $d
+C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s:673    .text.rcvr_datablock:0000000000000000 $t
+C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s:679    .text.rcvr_datablock:0000000000000000 rcvr_datablock
+C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s:755    .text.USER_SPI_initialize:0000000000000000 $t
+C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s:762    .text.USER_SPI_initialize:0000000000000000 USER_SPI_initialize
+C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s:1114   .text.USER_SPI_initialize:0000000000000160 $d
+C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s:1121   .text.USER_SPI_status:0000000000000000 $t
+C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s:1128   .text.USER_SPI_status:0000000000000000 USER_SPI_status
+C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s:1157   .text.USER_SPI_status:0000000000000010 $d
+C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s:1162   .text.USER_SPI_read:0000000000000000 $t
+C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s:1169   .text.USER_SPI_read:0000000000000000 USER_SPI_read
+C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s:1332   .text.USER_SPI_read:0000000000000084 $d
+C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s:1338   .text.USER_SPI_write:0000000000000000 $t
+C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s:1345   .text.USER_SPI_write:0000000000000000 USER_SPI_write
+C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s:1547   .text.USER_SPI_write:00000000000000a8 $d
+C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s:1553   .text.USER_SPI_ioctl:0000000000000000 $t
+C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s:1560   .text.USER_SPI_ioctl:0000000000000000 USER_SPI_ioctl
+C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s:1601   .text.USER_SPI_ioctl:0000000000000024 $d
+C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s:1606   .text.USER_SPI_ioctl:000000000000002e $t
+C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s:2052   .text.USER_SPI_ioctl:000000000000021c $d
+C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s:2070   .bss.spiTimerTickDelay:0000000000000000 spiTimerTickDelay
+C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s:2077   .bss.spiTimerTickStart:0000000000000000 spiTimerTickStart
+C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s:2063   .bss.CardType:0000000000000000 CardType
+C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s:2064   .bss.CardType:0000000000000000 $d
+C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s:2066   .bss.spiTimerTickDelay:0000000000000000 $d
+C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s:2073   .bss.spiTimerTickStart:0000000000000000 $d
+C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s:2083   .data.Stat:0000000000000000 Stat
+
+UNDEFINED SYMBOLS
+HAL_SPI_TransmitReceive
+hspi2
+ARM GAS  C:\Users\Falle\AppData\Local\Temp\ccmXDfKC.s 			page 56
+
+
+HAL_GetTick
+HAL_GPIO_WritePin
