@@ -67,6 +67,7 @@ extern SPI_HandleTypeDef SD_SPI_HANDLE;
 #define CMD9 (9)		   /* SEND_CSD */
 #define CMD10 (10)		   /* SEND_CID */
 #define CMD12 (12)		   /* STOP_TRANSMISSION */
+#define CMD13 (13)
 #define ACMD13 (0x80 + 13) /* SD_STATUS (SDC) */
 #define CMD16 (16)		   /* SET_BLOCKLEN */
 #define CMD17 (17)		   /* READ_SINGLE_BLOCK */
@@ -200,14 +201,16 @@ static int spiselect(void) /* 1:OK, 0:Timeout */
 /* Receive a data packet from the MMC                                    */
 /*-----------------------------------------------------------------------*/
 
+BYTE token;
+
 static int rcvr_datablock(			  /* 1:OK, 0:Error */
 						  BYTE *buff, /* Data buffer */
 						  UINT btr	  /* Data block length (byte) */
 )
 {
-	BYTE token;
+	token = 0;
 
-	SPI_Timer_On(200);
+	SPI_Timer_On(1000);
 	do
 	{ /* Wait for DataStart token in timeout of 200ms */
 		token = xchg_spi(0xFF);
@@ -256,6 +259,8 @@ static int xmit_datablock(					/* 1:OK, 0:Failed */
 /*-----------------------------------------------------------------------*/
 /* Send a command packet to the MMC                                      */
 /*-----------------------------------------------------------------------*/
+int cmdBuffer[100];
+int pivot = 0;
 
 static BYTE send_cmd(		   /* Return value: R1 resp (bit7==1:Failed to send) */
 					 BYTE cmd, /* Command index */
@@ -271,6 +276,9 @@ static BYTE send_cmd(		   /* Return value: R1 resp (bit7==1:Failed to send) */
 		if (res > 1)
 			return res;
 	}
+
+	cmdBuffer[pivot] = cmd;
+	pivot++;
 
 	/* Select the card and wait for ready except to stop multiple block read */
 	if (cmd != CMD12)
@@ -301,6 +309,7 @@ static BYTE send_cmd(		   /* Return value: R1 resp (bit7==1:Failed to send) */
 	{
 		res = xchg_spi(0xFF);
 	} while ((res & 0x80) && --n);
+	// xchg_spi(0xFF); /* Send an extra dummy byte to make SD well-prepared*/
 
 	return res; /* Return received response */
 }

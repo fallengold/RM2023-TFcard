@@ -50,5 +50,43 @@
 
 
 
+# 2023.2.3 Developing Progress
+
+### [*]CMD 9
+
+With R1 illegal command flag
+
+### [*]AMCD13 (Send rightly before CMD9)
+
+No data-block token (0xFE) is detected in a time-out of 1000ms after sending this command.
+
+Assuming some error occurs in SD when receiving this command, which may be the cause of the CMD9's illegal state.
+
+Normally, this command should return a 512-bytes block containing SD status.
+
+### [*]COMMAND SEQUENCE
+
+/*USER_SPI_INTIALIZE*/ 
+
+CMD0- Go to the idle state; Activate SPI mode
+
+CMD8- Detect SD-version 
+
+ACMD41-  Wait for the end of initialization with ACMD41 (??)
+
+ACMD41-  Same as above
+
+CMD58- Check the CCS bit in the OCR
+
+/*ff.MOVE_WINDOW*/
+
+CMD17- Read the data block to get the sector size
+
+
+
+ACMD13
+
+CMD9 
+
 
 
